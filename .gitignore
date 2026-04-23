@@ -1,0 +1,15 @@
+# node
+app/node_modules/
+harness/node_modules/
+
+# build outputs
+app/.next/
+harness/dist/
+
+# runtime
+harness/runs/
+.worktrees/
+
+# env
+.env
+.env.local
