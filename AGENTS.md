@@ -13,6 +13,7 @@ A web app for tracking names of regulars at regularly visited local venues.
 ## Core rules
 
 - Always run `npm run format-and-validate` to validate your code before committing. This single command covers formatting, type checking, linting, and tests — do not run any of these separately as an additional verification step.
+- files in `docs/*` are considered immutable, they are for reading reference only. never modify these files.
 
 ## Stack
 
