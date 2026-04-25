@@ -482,6 +482,7 @@ type Relationship = { personId: string; kind: string }; // "friend of", "runs wi
 | `MyRegulars Prototype.html` | Open this. Clickable React prototype — all screens, both themes, both viewports. |
 | `README.md` | This document. |
 | `screenshots/` | Reference PNGs of every screen (desktop + mobile, light + dark, all modals). |
+| `brand/` | Logos and wordmarks — see table below. |
 | `mr-shared.jsx` | Shared primitives: theme tokens, Avatar, Pill, Tag, Sheet, Modal, animations. |
 | `mr-mobile.jsx` | Mobile screens (onboarding → vault → location). |
 | `mr-mobile-detail.jsx` | Mobile person detail + bottom sheets. |
@@ -489,6 +490,19 @@ type Relationship = { personId: string; kind: string }; // "friend of", "runs wi
 | `mr-app.jsx` | Top-level app router/state. |
 | `data.jsx` | Sample vault data — use as the schema reference for v1 fixtures. |
 | `design-canvas.jsx` | Just for the prototype's multi-frame view; ignore for production. |
+
+### Brand assets (`brand/`)
+
+| File | Description |
+| --- | --- |
+| `MyRegulars-logo.svg` | Logo mark — vector source |
+| `MyRegulars-logo-128.png` | Logo mark raster, 128px |
+| `MyRegulars-logo-256.png` | Logo mark raster, 256px |
+| `MyRegulars-logo-512.png` | Logo mark raster, 512px |
+| `MyRegulars-logo-1024.png` | Logo mark raster, 1024px |
+| `MyRegulars-wordmark.svg` | Wordmark (logo + name) — vector source |
+| `MyRegulars-wordmark-960.png` | Wordmark raster, 960px wide |
+| `MyRegulars-wordmark-1920.png` | Wordmark raster, 1920px wide |
 
 To run the prototype locally: serve the folder over any static HTTP server (e.g. `npx serve .`), open `MyRegulars Prototype.html`. Babel transpiles in-browser, so first paint takes ~200ms.
 
