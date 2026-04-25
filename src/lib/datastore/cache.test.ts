@@ -13,7 +13,7 @@ function createSnapshot(): DatastoreSnapshot {
       schemaVersion: 1,
       updatedAt: "2026-04-23T12:00:00.000Z",
       data: {
-        venues: [],
+        locations: [],
       },
     },
   };

@@ -12,13 +12,13 @@ A web app for tracking names of regulars at regularly visited local venues.
 
 ## Core rules
 
-- Always run `npm run format-and-validate` to validate your code before committing.
+- Always run `npm run format-and-validate` to validate your code before committing. This single command covers formatting, type checking, linting, and tests — do not run any of these separately as an additional verification step.
 
 ## Stack
 
 - Next.js App Router, TypeScript strict mode
 - Tailwind for styling
-- Data layer: _TBD_ (some sort of bring-your-own database solution)
+- Data layer: bring-your-own datastore via pluggable adapters (`src/lib/datastore/`). v1 provider is GitHub Gists (one Gist = one vault). Vaults are JSON documents validated with Zod. All datastore access goes through `src/lib/db.ts`.
 
 ## Conventions
 
@@ -83,8 +83,5 @@ describe("MyComponent", () => {
 
 A task is done when:
 
-- `npm run format:check` passes
-- `npm run lint` passes
-- `npm run typecheck` passes
-- `npm test` passes
+- `npm run format-and-validate` passes
 - The change is minimal and does not touch unrelated files

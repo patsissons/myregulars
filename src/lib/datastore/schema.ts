@@ -4,7 +4,7 @@ import { DATASTORE_APP_NAME, DATASTORE_SCHEMA_VERSION } from "@/lib/datastore/co
 import { DatastoreValidationError } from "@/lib/datastore/errors";
 import type { MyRegularsDocument } from "@/lib/datastore/types";
 
-const venueSchema = z.object({}).catchall(z.unknown());
+const locationSchema = z.object({}).catchall(z.unknown());
 
 const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: "Expected a valid ISO-8601 timestamp.",
@@ -16,7 +16,7 @@ export const myRegularsDocumentSchema = z.object({
   updatedAt: isoTimestampSchema,
   data: z
     .object({
-      venues: z.array(venueSchema),
+      locations: z.array(locationSchema),
     })
     .strict(),
 });
@@ -27,7 +27,7 @@ export function createEmptyDocument(now = new Date()): MyRegularsDocument {
     schemaVersion: DATASTORE_SCHEMA_VERSION,
     updatedAt: now.toISOString(),
     data: {
-      venues: [],
+      locations: [],
     },
   };
 }

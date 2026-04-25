@@ -16,20 +16,20 @@ describe("schema", () => {
     expect(parseDocumentString(serialized)).toEqual(document);
   });
 
-  it("accepts documents with only data.venues", () => {
+  it("accepts documents with only data.locations", () => {
     const document = parseDocument({
       app: "myregulars",
       schemaVersion: 1,
       updatedAt: "2026-04-23T12:00:00.000Z",
       data: {
-        venues: [{ id: "venue-1", name: "Daily Grind" }],
+        locations: [{ id: "location-1", name: "Daily Grind" }],
       },
     });
 
-    expect(document.data.venues).toHaveLength(1);
+    expect(document.data.locations).toHaveLength(1);
   });
 
-  it("rejects documents that omit venues", () => {
+  it("rejects documents that omit locations", () => {
     expect(() =>
       parseDocument({
         app: "myregulars",
@@ -47,7 +47,7 @@ describe("schema", () => {
         schemaVersion: 2,
         updatedAt: "2026-04-23T12:00:00.000Z",
         data: {
-          venues: [],
+          locations: [],
         },
       }),
     ).toThrow(DatastoreValidationError);

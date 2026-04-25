@@ -1,13 +1,13 @@
 export type DatastoreUri = `gist:${string}`;
 
-export type VenueRecord = Record<string, unknown>;
+export type LocationRecord = Record<string, unknown>;
 
 export interface MyRegularsDocument {
   app: "myregulars";
   schemaVersion: 1;
   updatedAt: string;
   data: {
-    venues: VenueRecord[];
+    locations: LocationRecord[];
   };
 }
 
