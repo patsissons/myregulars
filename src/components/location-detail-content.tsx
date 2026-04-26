@@ -9,6 +9,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { PersonCard } from "@/components/ui/person-card";
 import { EmptyState } from "@/components/empty-state";
+import { AnimatedList, AnimatedItem } from "@/components/animated-list";
 import { useVault } from "@/lib/vault-context";
 import type { Location } from "@/lib/datastore/types";
 
@@ -151,7 +152,7 @@ export function LocationDetailContent({
                     )}
                   </div>
                 ) : (
-                  <div
+                  <AnimatedList
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
@@ -159,14 +160,17 @@ export function LocationDetailContent({
                     }}
                   >
                     {group.people.map((person) => (
-                      <PersonCard
-                        key={person.id}
-                        person={person}
-                        active={person.id === activePersonId}
-                        onClick={() => router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)}
-                      />
+                      <AnimatedItem key={person.id}>
+                        <PersonCard
+                          person={person}
+                          active={person.id === activePersonId}
+                          onClick={() =>
+                            router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)
+                          }
+                        />
+                      </AnimatedItem>
                     ))}
-                  </div>
+                  </AnimatedList>
                 )}
               </div>
             ))}

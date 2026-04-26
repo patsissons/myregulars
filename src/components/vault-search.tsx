@@ -107,6 +107,9 @@ export function VaultSearch({ vaultId, className }: VaultSearchProps) {
         <input
           ref={inputRef}
           type="text"
+          role="searchbox"
+          aria-label="Search vault"
+          aria-autocomplete="list"
           placeholder="Search vault"
           value={query}
           onChange={(e) => {
@@ -135,6 +138,8 @@ export function VaultSearch({ vaultId, className }: VaultSearchProps) {
       {/* Results dropdown */}
       {open && debouncedQuery && (
         <div
+          role="listbox"
+          aria-label="Search results"
           className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-[10px]"
           style={{
             background: "var(--mr-panel)",

@@ -139,7 +139,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
             type="button"
             onClick={toggleTheme}
             className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
-            aria-label="Toggle theme"
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           >
             {theme === "dark" ? (
               <Sun size={15} style={{ color: "var(--mr-dim)" }} />

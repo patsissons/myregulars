@@ -89,7 +89,9 @@ export function PersonDetailPane({
 
       {/* Hero */}
       <div className="flex flex-col items-center gap-2 px-5 pt-6 pb-4">
-        <Avatar name={person.name} size={56} photoUrl={person.photoUrl} />
+        <div style={{ animation: "mrPop 320ms cubic-bezier(.2,.9,.3,1.1) both" }}>
+          <Avatar name={person.name} size={56} photoUrl={person.photoUrl} />
+        </div>
         <div className="text-center">
           <h2
             style={{

@@ -111,7 +111,9 @@ export default function PersonPage({
 
         {/* Hero */}
         <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-5">
-          <Avatar name={person.name} size={68} photoUrl={person.photoUrl} />
+          <div style={{ animation: "mrPop 320ms cubic-bezier(.2,.9,.3,1.1) both" }}>
+            <Avatar name={person.name} size={68} photoUrl={person.photoUrl} />
+          </div>
           <div className="text-center">
             <h1
               style={{
