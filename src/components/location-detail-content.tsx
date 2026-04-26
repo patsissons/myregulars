@@ -8,6 +8,7 @@ import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { PersonCard } from "@/components/ui/person-card";
+import { EmptyState } from "@/components/empty-state";
 import { useVault } from "@/lib/vault-context";
 import type { Location } from "@/lib/datastore/types";
 
@@ -32,6 +33,8 @@ export function LocationDetailContent({
 
   const totalPeople = location.groups.flatMap((g) => g.people).length;
 
+  const hasSearch = search.length > 0;
+
   const visibleGroups = location.groups
     .filter((g) => activeGroupId === null || g.id === activeGroupId)
     .map((g) => ({
@@ -42,10 +45,10 @@ export function LocationDetailContent({
         return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
       }),
     }))
-    .filter((g) => g.people.length > 0);
+    // When searching, hide groups with no matches; otherwise show all groups
+    .filter((g) => !hasSearch || g.people.length > 0);
 
   const hasResults = visibleGroups.some((g) => g.people.length > 0);
-  const hasSearch = search.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -113,23 +116,15 @@ export function LocationDetailContent({
       {/* People grid */}
       <div className="flex-1 overflow-y-auto p-5">
         {!hasResults && hasSearch ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-[14px]" style={{ color: "var(--mr-faint)" }}>
-              No matches for &ldquo;{search}&rdquo;
-            </p>
-          </div>
+          <EmptyState heading="No matches" description={`Try a different search`} />
         ) : !hasResults ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16">
-            <p className="text-[14px]" style={{ color: "var(--mr-faint)" }}>
-              No people here yet.
-            </p>
-            {!isReadOnly && (
-              <Button variant="primary" size="md" onClick={onAddPerson}>
-                <Plus size={14} />
-                Add person
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            heading="No one here yet"
+            description="Add the first person to start tracking regulars at this spot."
+            action={
+              !isReadOnly ? { label: "Add person", onClick: onAddPerson ?? (() => {}) } : undefined
+            }
+          />
         ) : (
           <div className="flex flex-col gap-6">
             {visibleGroups.map((group) => (
@@ -139,22 +134,40 @@ export function LocationDetailContent({
                     {group.name} · {group.people.length}
                   </Eyebrow>
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {group.people.map((person) => (
-                    <PersonCard
-                      key={person.id}
-                      person={person}
-                      active={person.id === activePersonId}
-                      onClick={() => router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)}
-                    />
-                  ))}
-                </div>
+                {group.people.length === 0 ? (
+                  <div className="flex items-center gap-3">
+                    <p className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
+                      No people in this group
+                    </p>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={onAddPerson}
+                        className="text-[13px] transition-opacity hover:opacity-70"
+                        style={{ color: "var(--mr-accent)" }}
+                      >
+                        Add someone
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {group.people.map((person) => (
+                      <PersonCard
+                        key={person.id}
+                        person={person}
+                        active={person.id === activePersonId}
+                        onClick={() => router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

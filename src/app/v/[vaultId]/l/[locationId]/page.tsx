@@ -8,6 +8,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { PersonRow } from "@/components/ui/person-row";
 import { LocationDetailContent } from "@/components/location-detail-content";
+import { EmptyState } from "@/components/empty-state";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
 import { useVault } from "@/lib/vault-context";
 
@@ -40,6 +41,8 @@ export default function LocationPage({
   }
 
   // Mobile filter state
+  const hasSearch = search.length > 0;
+
   const visibleGroups = location.groups
     .filter((g) => activeGroupId === null || g.id === activeGroupId)
     .map((g) => ({
@@ -50,10 +53,10 @@ export default function LocationPage({
         return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
       }),
     }))
-    .filter((g) => g.people.length > 0);
+    // When searching, hide groups with no matches; otherwise show all groups
+    .filter((g) => !hasSearch || g.people.length > 0);
 
   const hasResults = visibleGroups.some((g) => g.people.length > 0);
-  const hasSearch = search.length > 0;
 
   function handleAddPerson() {
     if (!location) return;
@@ -156,33 +159,51 @@ export default function LocationPage({
         {/* People sections */}
         <div className="flex flex-col gap-6 px-5">
           {!hasResults && hasSearch ? (
-            <p className="py-8 text-center text-[14px]" style={{ color: "var(--mr-faint)" }}>
-              No matches for &ldquo;{search}&rdquo;
-            </p>
+            <EmptyState heading="No matches" description="Try a different search" />
           ) : !hasResults ? (
-            <p className="py-8 text-center text-[14px]" style={{ color: "var(--mr-faint)" }}>
-              No people here yet.
-            </p>
+            <EmptyState
+              heading="No one here yet"
+              description="Add the first person to start tracking regulars."
+              action={!isReadOnly ? { label: "Add person", onClick: handleAddPerson } : undefined}
+            />
           ) : (
             visibleGroups.map((group) => (
               <div key={group.id}>
                 <Eyebrow className="mb-2 block">
                   {group.name} · {group.people.length}
                 </Eyebrow>
-                <div
-                  className="flex flex-col overflow-hidden rounded-[14px] px-4"
-                  style={{ background: "var(--mr-panel)", border: "1px solid var(--mr-edge)" }}
-                >
-                  {group.people.map((person) => (
-                    <PersonRow
-                      key={person.id}
-                      person={person}
-                      isReadOnly={isReadOnly}
-                      onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
-                      onLog={() => logVisit(locationId, group.id, person.id)}
-                    />
-                  ))}
-                </div>
+                {group.people.length === 0 ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <p className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
+                      No people in this group
+                    </p>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={handleAddPerson}
+                        className="text-[13px] transition-opacity hover:opacity-70"
+                        style={{ color: "var(--mr-accent)" }}
+                      >
+                        Add someone
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="flex flex-col overflow-hidden rounded-[14px] px-4"
+                    style={{ background: "var(--mr-panel)", border: "1px solid var(--mr-edge)" }}
+                  >
+                    {group.people.map((person) => (
+                      <PersonRow
+                        key={person.id}
+                        person={person}
+                        isReadOnly={isReadOnly}
+                        onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
+                        onLog={() => logVisit(locationId, group.id, person.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}

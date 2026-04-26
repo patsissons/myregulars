@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Moon, MoreHorizontal, Plus, Search, Sun } from "lucide-react";
+import { Moon, MoreHorizontal, Plus, Sun } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -17,6 +17,7 @@ import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
 import { useShareDialog } from "@/components/share-dialog";
 import { LayoutTransition } from "@/components/layout-transition";
+import { VaultSearch } from "@/components/vault-search";
 import { VaultLoader } from "./vault-loader";
 
 interface VaultShellProps {
@@ -32,7 +33,6 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
 
   const { openShare, ShareDialogComponent } = useShareDialog();
 
-  const [sidebarSearch, setSidebarSearch] = useState("");
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
   const [newPlaceName, setNewPlaceName] = useState("");
   const [newPlaceDesc, setNewPlaceDesc] = useState("");
@@ -48,11 +48,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   // Sync label derived in render (no setState needed)
   const syncLabel = isSyncing ? "syncing…" : "saved";
 
-  // Filter locations by sidebar search
-  const filteredLocations =
-    vault?.locations.filter(
-      (l) => !sidebarSearch || l.name.toLowerCase().includes(sidebarSearch.toLowerCase()),
-    ) ?? [];
+  const filteredLocations = vault?.locations ?? [];
 
   // Recent people: top 5 by lastSeen across all locations
   const recentPeople = getAllPeople(vault)
@@ -184,34 +180,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
         >
           {/* Search */}
           <div className="px-3 pt-3 pb-2">
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
-                style={{ color: "var(--mr-faint)" }}
-              />
-              <input
-                type="text"
-                placeholder="Search vault"
-                value={sidebarSearch}
-                onChange={(e) => setSidebarSearch(e.target.value)}
-                className="w-full rounded-[8px] py-[6px] pr-10 pl-[30px] text-[13px] outline-none"
-                style={{
-                  background: "var(--mr-subtle)",
-                  color: "var(--mr-text)",
-                }}
-              />
-              <div
-                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded px-[5px] py-[2px] text-[10px]"
-                style={{
-                  background: "var(--mr-edge)",
-                  color: "var(--mr-faint)",
-                  lineHeight: 1.3,
-                }}
-              >
-                ⌘K
-              </div>
-            </div>
+            <VaultSearch vaultId={vaultId} />
           </div>
 
           {/* PLACES */}
