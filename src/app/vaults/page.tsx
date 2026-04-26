@@ -1,0 +1,190 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LogoMark } from "@/components/logo-mark";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { VaultCard, NewVaultCard } from "@/components/vault-card";
+import { useAuth } from "@/lib/auth-context";
+import { VaultProvider, useVault } from "@/lib/vault-context";
+import { getKnownVaults } from "@/lib/known-vaults";
+import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
+import type { KnownVault } from "@/lib/vault-types";
+
+function VaultsContent() {
+  const router = useRouter();
+  const { username } = useAuth();
+  const { createVault } = useVault();
+  // Read from localStorage in lazy initializer (client-only component)
+  const [vaults] = useState<KnownVault[]>(() =>
+    typeof localStorage !== "undefined" ? getKnownVaults() : [],
+  );
+  const [showNewVaultModal, setShowNewVaultModal] = useState(false);
+  const [newVaultName, setNewVaultName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [linkInput, setLinkInput] = useState("");
+  const [linkError, setLinkError] = useState("");
+
+  async function handleCreateVault() {
+    if (!newVaultName.trim()) return;
+    setIsCreating(true);
+    try {
+      const uri = await createVault(newVaultName.trim());
+      const gistId = getGistIdFromUri(uri);
+      setShowNewVaultModal(false);
+      router.push(`/v/${gistId}`);
+    } catch (err) {
+      console.error("Failed to create vault:", err);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  function handleOpenByLink() {
+    if (!linkInput.trim()) {
+      setLinkError("Enter a vault link or gist ID.");
+      return;
+    }
+    try {
+      const uri = normalizeDatastoreUri(linkInput.trim());
+      const gistId = getGistIdFromUri(uri);
+      router.push(`/v/${gistId}`);
+    } catch {
+      setLinkError("Invalid vault link. Try a gist ID or share URL.");
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-screen flex-col"
+      style={{ background: "var(--mr-bg)", color: "var(--mr-text)" }}
+    >
+      <div className="mx-auto w-full max-w-[720px] px-5 py-8">
+        {/* Header */}
+        <div className="mb-2 flex items-center gap-3">
+          <LogoMark size={32} />
+        </div>
+        {username && <Eyebrow className="mb-1 block">Signed in · github.com/{username}</Eyebrow>}
+        <h1
+          className="mb-6"
+          style={{
+            fontSize: 28,
+            fontWeight: 600,
+            letterSpacing: "-0.025em",
+            color: "var(--mr-text)",
+          }}
+        >
+          Your vaults
+        </h1>
+
+        {/* Vault grid */}
+        <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
+          {vaults.length === 0 && (
+            <p className="col-span-full mb-4 text-[14px]" style={{ color: "var(--mr-dim)" }}>
+              Welcome. Start your first notebook.
+            </p>
+          )}
+          {vaults.map((vault) => (
+            <VaultCard
+              key={vault.uri}
+              vault={vault}
+              onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
+            />
+          ))}
+          <NewVaultCard onClick={() => setShowNewVaultModal(true)} />
+        </div>
+
+        {/* Open by link (mobile prominent, desktop secondary) */}
+        <div className="mt-8">
+          <Eyebrow className="mb-3 block">Or open by link</Eyebrow>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                placeholder="gist:abc123 or share URL"
+                value={linkInput}
+                onChange={(e) => {
+                  setLinkInput(e.target.value);
+                  setLinkError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleOpenByLink()}
+              />
+              {linkError && (
+                <p className="mt-1 text-[12px]" style={{ color: "var(--mr-danger)" }}>
+                  {linkError}
+                </p>
+              )}
+            </div>
+            <Button variant="primary" size="md" onClick={handleOpenByLink}>
+              Open
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* New Vault Modal */}
+      <Modal
+        open={showNewVaultModal}
+        onOpenChange={(open) => {
+          setShowNewVaultModal(open);
+          if (!open) setNewVaultName("");
+        }}
+        title="New vault"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <Input
+            placeholder="My regulars"
+            value={newVaultName}
+            onChange={(e) => setNewVaultName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !isCreating && handleCreateVault()}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateVault}
+              disabled={!newVaultName.trim() || isCreating}
+            >
+              {isCreating ? "Creating…" : "Create vault"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+export default function VaultsPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ background: "var(--mr-bg)" }}
+      >
+        <div className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
+          Loading…
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <VaultProvider>
+      <VaultsContent />
+    </VaultProvider>
+  );
+}
