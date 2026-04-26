@@ -1,4 +1,8 @@
-import { DATASTORE_FILE_NAME, GITHUB_GISTS_API_URL } from "@/lib/datastore/constants";
+import {
+  DATASTORE_FILE_NAME,
+  DATASTORE_FILE_PATTERN,
+  GITHUB_GISTS_API_URL,
+} from "@/lib/datastore/constants";
 import { AuthRequiredError, DatastoreValidationError } from "@/lib/datastore/errors";
 import { clearGitHubAuthToken } from "@/lib/datastore/auth";
 import {
@@ -37,6 +41,7 @@ interface GistCommitResponse {
 interface GistStorageAdapterOptions {
   authToken?: string | null;
   fetchImpl?: typeof fetch;
+  fileName?: string;
 }
 
 function buildHeaders(authToken?: string | null): HeadersInit {
@@ -61,16 +66,27 @@ function requireAuthToken(authToken?: string | null): string {
   return authToken;
 }
 
-function readManagedFile(response: GistResponse): MyRegularsDocument {
-  const file = response.files[DATASTORE_FILE_NAME];
-
-  if (!file?.content) {
-    throw new DatastoreValidationError(
-      `The gist does not contain the required ${DATASTORE_FILE_NAME} file.`,
-    );
+function readManagedFile(response: GistResponse): {
+  document: MyRegularsDocument;
+  fileName: string;
+} {
+  // Prefer named pattern files (e.g. myregulars.home.json) over legacy fallback
+  const patternEntry = Object.entries(response.files).find(
+    ([name, file]) => DATASTORE_FILE_PATTERN.test(name) && file?.content,
+  );
+  if (patternEntry && patternEntry[1]?.content) {
+    return { document: parseDocumentString(patternEntry[1].content), fileName: patternEntry[0] };
   }
 
-  return parseDocumentString(file.content);
+  // Legacy fallback: myregulars.json
+  const legacy = response.files[DATASTORE_FILE_NAME];
+  if (legacy?.content) {
+    return { document: parseDocumentString(legacy.content), fileName: DATASTORE_FILE_NAME };
+  }
+
+  throw new DatastoreValidationError(
+    `The gist does not contain the required ${DATASTORE_FILE_NAME} file.`,
+  );
 }
 
 function getLatestVersion(response: GistResponse): string {
@@ -108,11 +124,18 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
   private readonly authToken: string | null;
   private readonly fetchImpl: typeof fetch;
+  private readonly fileName: string;
+  private detectedFileName: string | null = null;
   private uri: DatastoreUri | null = null;
 
   constructor(options: GistStorageAdapterOptions = {}) {
     this.authToken = options.authToken ?? null;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    this.fileName = options.fileName ?? DATASTORE_FILE_NAME;
+  }
+
+  getVaultFileName(): string | null {
+    return this.detectedFileName;
   }
 
   async connect(uri: string): Promise<void> {
@@ -127,7 +150,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
       body: JSON.stringify({
         public: false,
         files: {
-          [DATASTORE_FILE_NAME]: {
+          [this.fileName]: {
             content: serializeDocument(createEmptyDocument()),
           },
         },
@@ -135,18 +158,21 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     });
     const gist = await parseJsonResponse<GistResponse>(response);
     this.uri = normalizeDatastoreUri(gist.id);
+    const { document, fileName } = readManagedFile(gist);
+    this.detectedFileName = fileName;
     return {
       uri: this.getUri(),
-      data: readManagedFile(gist),
+      data: document,
       version: getLatestVersion(gist),
     };
   }
 
   async read(): Promise<{ data: MyRegularsDocument; version: string }> {
     const gist = await this.fetchGist();
-
+    const { document, fileName } = readManagedFile(gist);
+    this.detectedFileName = fileName;
     return {
-      data: readManagedFile(gist),
+      data: document,
       version: getLatestVersion(gist),
     };
   }
@@ -157,9 +183,10 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
       headers: buildHeaders(this.authToken),
     });
     const gist = await parseJsonResponse<GistResponse>(response);
-
+    const { document, fileName } = readManagedFile(gist);
+    this.detectedFileName = fileName;
     return {
-      data: readManagedFile(gist),
+      data: document,
       version,
     };
   }
@@ -167,12 +194,13 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
   async write(data: MyRegularsDocument): Promise<string> {
     const gistId = this.getConnectedGistId();
     const authToken = requireAuthToken(this.authToken);
+    const fileKey = this.detectedFileName ?? this.fileName;
     const response = await this.fetchImpl(`${GITHUB_GISTS_API_URL}/${gistId}`, {
       method: "PATCH",
       headers: buildHeaders(authToken),
       body: JSON.stringify({
         files: {
-          [DATASTORE_FILE_NAME]: {
+          [fileKey]: {
             content: serializeDocument(data),
           },
         },

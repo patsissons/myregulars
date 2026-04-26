@@ -92,7 +92,7 @@ export default function PersonPage({
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
             aria-label="Back"
           >
             <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
@@ -101,7 +101,7 @@ export default function PersonPage({
             <button
               type="button"
               onClick={handleEdit}
-              className="text-[14px] font-[500] transition-opacity hover:opacity-70"
+              className="text-[14px] font-[500] transition-opacity hover:opacity-50"
               style={{ color: "var(--mr-accent)" }}
             >
               Edit

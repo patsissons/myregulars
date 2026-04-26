@@ -22,14 +22,14 @@ export function PersonCard({ person, active, onClick, className }: PersonCardPro
       onClick={onClick}
       className={cn(
         "flex w-full flex-col gap-2 rounded-[12px] p-[14px] text-left transition-all duration-[120ms]",
-        "border",
-        "active:scale-[0.99]",
+        "border-mr-edge hover:bg-mr-subtle border hover:border-black/50! active:scale-[0.99]",
         className,
       )}
       style={{
         background: "var(--mr-panel)",
-        borderColor: active ? "var(--mr-accent)" : "var(--mr-edge)",
-        boxShadow: active ? "0 0 0 3px var(--mr-accent-soft)" : "none",
+        ...(active
+          ? { borderColor: "var(--mr-accent)", boxShadow: "0 0 0 3px var(--mr-accent-soft)" }
+          : {}),
       }}
     >
       <div className="flex items-center gap-2.5">

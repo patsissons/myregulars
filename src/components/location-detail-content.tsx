@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { PersonCard } from "@/components/ui/person-card";
 import { EmptyState } from "@/components/empty-state";
 import { AnimatedList, AnimatedItem } from "@/components/animated-list";
+import { useToast } from "@/components/ui/toast";
 import { useVault } from "@/lib/vault-context";
 import type { Location } from "@/lib/datastore/types";
 
@@ -27,10 +28,22 @@ export function LocationDetailContent({
   onAddPerson,
 }: LocationDetailContentProps) {
   const router = useRouter();
-  const { isReadOnly } = useVault();
+  const { isReadOnly, deleteGroup } = useVault();
+  const { showToast } = useToast();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  function handleDeleteGroup(groupId: string, groupName: string, peopleCount: number) {
+    if (peopleCount > 0) {
+      showToast(
+        `Move or remove all ${peopleCount} ${peopleCount === 1 ? "person" : "people"} in "${groupName}" first.`,
+      );
+      return;
+    }
+    deleteGroup(location.id, groupId);
+    if (activeGroupId === groupId) setActiveGroupId(null);
+  }
 
   const totalPeople = location.groups.flatMap((g) => g.people).length;
 
@@ -107,9 +120,22 @@ export function LocationDetailContent({
             All
           </Chip>
           {location.groups.map((g) => (
-            <Chip key={g.id} active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
-              {g.name}
-            </Chip>
+            <div key={g.id} className="flex items-center gap-0.5">
+              <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
+                {g.name}
+              </Chip>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
+                  className="hover:bg-mr-subtle flex h-5 w-5 items-center justify-center rounded-full transition-colors"
+                  style={{ color: "var(--mr-faint)" }}
+                  aria-label={`Delete group ${g.name}`}
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -144,7 +170,7 @@ export function LocationDetailContent({
                       <button
                         type="button"
                         onClick={onAddPerson}
-                        className="text-[13px] transition-opacity hover:opacity-70"
+                        className="text-[13px] transition-opacity hover:opacity-50"
                         style={{ color: "var(--mr-accent)" }}
                       >
                         Add someone

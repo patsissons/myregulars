@@ -57,6 +57,7 @@ export const locationSchema = z.object({
 export const myRegularsDocumentSchema = z.object({
   app: z.literal(DATASTORE_APP_NAME),
   schemaVersion: z.literal(DATASTORE_SCHEMA_VERSION),
+  name: z.string().optional(),
   updatedAt: isoTimestampSchema,
   data: z
     .object({

@@ -15,13 +15,12 @@ export function VaultCard({ vault, onClick, className }: VaultCardProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-2 rounded-[14px] p-[16px] text-left transition-all duration-[120ms]",
-        "border active:scale-[0.99]",
+        "flex h-full w-full flex-col gap-2 rounded-[14px] p-[16px] text-left transition-all duration-[120ms]",
+        "border-mr-edge hover:bg-mr-subtle border hover:border-black/50! active:scale-[0.99]",
         className,
       )}
       style={{
         background: "var(--mr-panel)",
-        borderColor: "var(--mr-edge)",
       }}
     >
       <div className="flex items-center justify-between">
@@ -74,7 +73,7 @@ export function NewVaultCard({ onClick, className }: NewVaultCardProps) {
       onClick={onClick}
       className={cn(
         "flex w-full flex-col items-center justify-center gap-2 rounded-[14px] p-[24px] text-left transition-all duration-[120ms]",
-        "active:scale-[0.99]",
+        "hover:bg-mr-subtle hover:border-black/50! active:scale-[0.99]",
         className,
       )}
       style={{

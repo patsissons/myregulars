@@ -71,7 +71,7 @@ export function PersonDetailPane({
           <button
             type="button"
             onClick={onEdit}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            className="hover:bg-mr-subtle flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
             aria-label="Edit person"
           >
             <Pencil size={14} style={{ color: "var(--mr-dim)" }} />
@@ -80,7 +80,7 @@ export function PersonDetailPane({
         <button
           type="button"
           onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+          className="hover:bg-mr-subtle flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
           aria-label="Close"
         >
           <X size={16} style={{ color: "var(--mr-dim)" }} />

@@ -38,7 +38,11 @@ export function Chip({ children, active, onClick, variant = "default", className
     return (
       <button
         type="button"
-        className={cn(base, "active:scale-[0.97]", className)}
+        className={cn(
+          base,
+          "border border-black/10 hover:border-black/50! hover:brightness-95 active:scale-[0.97] dark:hover:brightness-110",
+          className,
+        )}
         style={styles}
         onClick={onClick}
       >

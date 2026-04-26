@@ -31,7 +31,7 @@ export function ProviderRow({
         className={cn(
           "flex w-full items-center gap-3 rounded-[14px] p-[14px] text-left transition-colors duration-100",
           "border",
-          enabled && !isLoading && "hover:opacity-90 active:opacity-80",
+          enabled && !isLoading && "hover:bg-mr-subtle active:opacity-80",
           (!enabled || isLoading) && "cursor-not-allowed",
         )}
         style={{

@@ -64,6 +64,7 @@ export function Modal({ open, onOpenChange, title, children, width = 480, classN
               >
                 {title}
               </Dialog.Title>
+              <Dialog.Description />
               <Dialog.Close
                 aria-label="Close"
                 style={{

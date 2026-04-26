@@ -5,10 +5,16 @@ import { createDatastore, loadDatastore, saveDatastore } from "@/lib/db";
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
-import { createGroup, createLocation, createPerson, generateId } from "@/lib/datastore/helpers";
+import {
+  createGroup,
+  createLocation,
+  createPerson,
+  extractVaultNameFromFileName,
+  generateId,
+} from "@/lib/datastore/helpers";
 import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAuthenticatedUser } from "@/lib/github-user";
-import { addKnownVault, updateKnownVault } from "@/lib/known-vaults";
+import { addKnownVault, getKnownVaults, updateKnownVault } from "@/lib/known-vaults";
 import type { Group, Location, Person } from "@/lib/datastore/types";
 import type { DatastoreUri } from "@/lib/datastore/types";
 import type { Vault } from "@/lib/vault-types";
@@ -31,6 +37,8 @@ interface VaultContextValue extends VaultState {
   updateLocation: (locationId: string, updates: Partial<Location>) => void;
   deleteLocation: (locationId: string) => void;
   addGroup: (locationId: string, name: string) => string;
+  deleteGroup: (locationId: string, groupId: string) => void;
+  updateVaultName: (name: string) => void;
   addPerson: (
     locationId: string,
     groupId: string,
@@ -43,6 +51,12 @@ interface VaultContextValue extends VaultState {
     updates: Partial<Person>,
   ) => void;
   deletePerson: (locationId: string, groupId: string, personId: string) => void;
+  movePerson: (
+    locationId: string,
+    fromGroupId: string,
+    toGroupId: string,
+    personId: string,
+  ) => void;
   logVisit: (locationId: string, groupId: string, personId: string, note?: string) => void;
   cloneVault: (name: string) => Promise<DatastoreUri>;
 }
@@ -93,6 +107,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       try {
         const document = {
           ...createEmptyDocument(),
+          name: vault.name,
           data: { locations: vault.locations },
         };
 
@@ -176,8 +191,14 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      const existingVault = getKnownVaults().find((v) => v.uri === uri);
+      const nameFromFile = snapshot.vaultFileName
+        ? extractVaultNameFromFileName(snapshot.vaultFileName)
+        : null;
+      const nameFromDocument = snapshot.document.name;
       const vault: Vault = {
-        name: `Vault ${gistId.slice(0, 6)}`,
+        name:
+          existingVault?.name ?? nameFromDocument ?? nameFromFile ?? `Vault ${gistId.slice(0, 6)}`,
         locations: snapshot.document.data.locations,
       };
 
@@ -212,7 +233,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createVault = useCallback(async (name: string): Promise<DatastoreUri> => {
-    const snapshot = await createDatastore();
+    const snapshot = await createDatastore(name);
     const uri = snapshot.uri;
 
     const vault: Vault = { name, locations: [] };
@@ -262,6 +283,12 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   const addGroup = useCallback(
     (locationId: string, name: string): string => {
+      const normalizedName = name.trim().toLowerCase();
+      const location = vaultRef.current?.locations.find((l) => l.id === locationId);
+      const existing = location?.groups.find((g) => g.name.toLowerCase() === normalizedName);
+      if (existing) {
+        return existing.id;
+      }
       const newGroup = createGroup(name);
       mutateLocations((locs) =>
         locs.map((l) =>
@@ -278,6 +305,37 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [scheduleSync],
+  );
+
+  const deleteGroup = useCallback(
+    (locationId: string, groupId: string) => {
+      mutateLocations((locs) =>
+        locs.map((l) =>
+          l.id === locationId
+            ? {
+                ...l,
+                groups: l.groups.filter((g) => g.id !== groupId),
+                updatedAt: new Date().toISOString(),
+              }
+            : l,
+        ),
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scheduleSync],
+  );
+
+  const updateVaultName = useCallback(
+    (name: string) => {
+      const current = vaultRef.current;
+      const uri = uriRef.current;
+      if (!current || !uri) return;
+      const updated: Vault = { ...current, name };
+      setVault(updated);
+      updateKnownVault(uri, { name });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const addPerson = useCallback(
@@ -362,6 +420,43 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
               }
             : l,
         ),
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scheduleSync],
+  );
+
+  const movePerson = useCallback(
+    (locationId: string, fromGroupId: string, toGroupId: string, personId: string) => {
+      mutateLocations((locs) =>
+        locs.map((l) => {
+          if (l.id !== locationId) return l;
+          const person = l.groups
+            .find((g) => g.id === fromGroupId)
+            ?.people.find((p) => p.id === personId);
+          if (!person) return l;
+          return {
+            ...l,
+            groups: l.groups.map((g) => {
+              if (g.id === fromGroupId) {
+                return {
+                  ...g,
+                  people: g.people.filter((p) => p.id !== personId),
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              if (g.id === toGroupId) {
+                return {
+                  ...g,
+                  people: [...g.people, person],
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              return g;
+            }),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -469,9 +564,12 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     updateLocation,
     deleteLocation,
     addGroup,
+    deleteGroup,
+    updateVaultName,
     addPerson,
     updatePerson,
     deletePerson,
+    movePerson,
     logVisit,
     cloneVault,
   };

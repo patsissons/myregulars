@@ -2,14 +2,18 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MoreHorizontal, Plus, Search } from "lucide-react";
+import { ChevronLeft, MoreHorizontal, Plus, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { PersonRow } from "@/components/ui/person-row";
 import { LocationDetailContent } from "@/components/location-detail-content";
 import { EmptyState } from "@/components/empty-state";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
+import { useToast } from "@/components/ui/toast";
 import { useVault } from "@/lib/vault-context";
 
 export default function LocationPage({
@@ -19,11 +23,15 @@ export default function LocationPage({
 }) {
   const { vaultId, locationId } = use(params);
   const router = useRouter();
-  const { vault, isReadOnly, logVisit } = useVault();
+  const { vault, isReadOnly, logVisit, updateLocation, deleteLocation, deleteGroup } = useVault();
   const { openAdd, DialogComponent } = usePersonFormDialog();
+  const { showToast } = useToast();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const location = vault?.locations.find((l) => l.id === locationId);
 
@@ -63,6 +71,29 @@ export default function LocationPage({
     openAdd(locationId, location);
   }
 
+  function handleDeleteGroup(groupId: string, groupName: string, peopleCount: number) {
+    if (peopleCount > 0) {
+      showToast(
+        `Move or remove all ${peopleCount} ${peopleCount === 1 ? "person" : "people"} in "${groupName}" first.`,
+      );
+      return;
+    }
+    deleteGroup(locationId, groupId);
+    if (activeGroupId === groupId) setActiveGroupId(null);
+  }
+
+  function handleRenamePlace() {
+    if (!renameValue.trim()) return;
+    updateLocation(locationId, { name: renameValue.trim() });
+    setShowRenameModal(false);
+    setRenameValue("");
+  }
+
+  function handleDeletePlace() {
+    deleteLocation(locationId);
+    router.push(`/v/${vaultId}`);
+  }
+
   return (
     <>
       {/* ─── Desktop center pane ─── */}
@@ -90,18 +121,38 @@ export default function LocationPage({
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
             aria-label="Back"
           >
             <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
           </button>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
-            aria-label="More options"
-          >
-            <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
-          </button>
+          {!isReadOnly && (
+            <DropdownMenu
+              items={[
+                {
+                  label: "Rename place",
+                  onClick: () => {
+                    setRenameValue(location.name);
+                    setShowRenameModal(true);
+                  },
+                },
+                {
+                  label: "Delete place",
+                  onClick: () => setShowDeleteConfirm(true),
+                  destructive: true,
+                },
+              ]}
+              trigger={
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                  aria-label="More options"
+                >
+                  <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
+                </button>
+              }
+            />
+          )}
         </div>
 
         {/* Location info */}
@@ -145,13 +196,22 @@ export default function LocationPage({
               All
             </Chip>
             {location.groups.map((g) => (
-              <Chip
-                key={g.id}
-                active={activeGroupId === g.id}
-                onClick={() => setActiveGroupId(g.id)}
-              >
-                {g.name}
-              </Chip>
+              <div key={g.id} className="flex items-center gap-0.5">
+                <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
+                  {g.name}
+                </Chip>
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
+                    className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                    style={{ color: "var(--mr-faint)" }}
+                    aria-label={`Delete group ${g.name}`}
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -181,7 +241,7 @@ export default function LocationPage({
                       <button
                         type="button"
                         onClick={handleAddPerson}
-                        className="text-[13px] transition-opacity hover:opacity-70"
+                        className="text-[13px] transition-opacity hover:opacity-50"
                         style={{ color: "var(--mr-accent)" }}
                       >
                         Add someone
@@ -234,6 +294,53 @@ export default function LocationPage({
       </div>
 
       {DialogComponent}
+
+      {/* Rename Place Modal */}
+      <Modal
+        open={showRenameModal}
+        onOpenChange={(open) => {
+          setShowRenameModal(open);
+          if (!open) setRenameValue("");
+        }}
+        title="Rename place"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <Input
+            placeholder="Place name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRenamePlace()}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleRenamePlace} disabled={!renameValue.trim()}>
+              Rename
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Place Confirmation Modal */}
+      <Modal open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm} title="Delete place">
+        <div className="flex flex-col gap-4 p-5">
+          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
+            This will permanently delete{" "}
+            <strong style={{ color: "var(--mr-text)" }}>{location.name}</strong> and all its people.
+            This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeletePlace}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

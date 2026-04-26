@@ -1,4 +1,5 @@
 export const DATASTORE_FILE_NAME = "myregulars.json";
+export const DATASTORE_FILE_PATTERN = /^myregulars\.[^.]+\.json$/;
 export const DATASTORE_APP_NAME = "myregulars";
 export const DATASTORE_SCHEMA_VERSION = 1;
 

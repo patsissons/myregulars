@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,9 @@ import { Modal } from "@/components/ui/modal";
 import { VaultCard, NewVaultCard } from "@/components/vault-card";
 import { useAuth } from "@/lib/auth-context";
 import { VaultProvider, useVault } from "@/lib/vault-context";
-import { getKnownVaults } from "@/lib/known-vaults";
+import { getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
 import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
+import type { DatastoreUri } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
 
 function VaultsContent() {
@@ -19,7 +21,7 @@ function VaultsContent() {
   const { username } = useAuth();
   const { createVault } = useVault();
   // Read from localStorage in lazy initializer (client-only component)
-  const [vaults] = useState<KnownVault[]>(() =>
+  const [vaults, setVaults] = useState<KnownVault[]>(() =>
     typeof localStorage !== "undefined" ? getKnownVaults() : [],
   );
   const [showNewVaultModal, setShowNewVaultModal] = useState(false);
@@ -27,6 +29,11 @@ function VaultsContent() {
   const [isCreating, setIsCreating] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
+
+  function handleDeleteVault(uri: DatastoreUri) {
+    removeKnownVault(uri);
+    setVaults((prev) => prev.filter((v) => v.uri !== uri));
+  }
 
   async function handleCreateVault() {
     if (!newVaultName.trim()) return;
@@ -88,11 +95,25 @@ function VaultsContent() {
             </p>
           )}
           {vaults.map((vault) => (
-            <VaultCard
-              key={vault.uri}
-              vault={vault}
-              onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
-            />
+            <div key={vault.uri} className="relative flex flex-col">
+              <VaultCard
+                vault={vault}
+                onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
+              />
+              <button
+                type="button"
+                onClick={() => handleDeleteVault(vault.uri)}
+                className="absolute top-[14px] right-[14px] z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-black/[0.1] dark:hover:bg-white/[0.12]"
+                style={{
+                  background: "var(--mr-subtle)",
+                  border: "1px solid var(--mr-edge)",
+                  color: "var(--mr-dim)",
+                }}
+                aria-label="Remove vault from list"
+              >
+                <X size={11} />
+              </button>
+            </div>
           ))}
           <NewVaultCard onClick={() => setShowNewVaultModal(true)} />
         </div>
@@ -100,7 +121,7 @@ function VaultsContent() {
         {/* Open by link (mobile prominent, desktop secondary) */}
         <div className="mt-8">
           <Eyebrow className="mb-3 block">Or open by link</Eyebrow>
-          <div className="flex gap-2">
+          <div className="flex items-start gap-2">
             <div className="flex-1">
               <Input
                 placeholder="gist:abc123 or share URL"

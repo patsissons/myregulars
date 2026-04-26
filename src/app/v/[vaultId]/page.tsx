@@ -1,16 +1,21 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MoreHorizontal, Plus, Search } from "lucide-react";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { useVault } from "@/lib/vault-context";
 
 export default function VaultPage({ params }: { params: Promise<{ vaultId: string }> }) {
   const { vaultId } = use(params);
   const router = useRouter();
-  const { vault, isReadOnly, addLocation } = useVault();
+  const { vault, isReadOnly, addLocation, updateVaultName } = useVault();
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   // On desktop, redirect to first location when vault is ready
   useEffect(() => {
@@ -39,18 +44,32 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
         <button
           type="button"
           onClick={() => router.push("/vaults")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
           aria-label="Back to vaults"
         >
           <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
         </button>
-        <button
-          type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
-          aria-label="More options"
-        >
-          <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
-        </button>
+        <DropdownMenu
+          items={[
+            {
+              label: "Rename vault",
+              onClick: () => {
+                setRenameValue(vault?.name ?? "");
+                setShowRenameModal(true);
+              },
+            },
+            { label: "Close vault", onClick: () => router.push("/vaults") },
+          ]}
+          trigger={
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+              aria-label="More options"
+            >
+              <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
+            </button>
+          }
+        />
       </div>
 
       <div className="px-5 pt-5 pb-6">
@@ -99,7 +118,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
                   key={location.id}
                   type="button"
                   onClick={() => router.push(`/v/${vaultId}/l/${location.id}`)}
-                  className="flex w-full items-center gap-3 px-4 py-[14px] text-left transition-opacity active:opacity-70"
+                  className="flex w-full items-center gap-3 px-4 py-[14px] text-left transition-colors hover:bg-black/[0.04] active:opacity-70 dark:hover:bg-white/[0.05]"
                   style={{
                     borderTop: idx > 0 ? "1px solid var(--mr-edge)" : undefined,
                   }}
@@ -135,7 +154,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
               const name = window.prompt("Place name:");
               if (name?.trim()) addLocation(name.trim());
             }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-[14px] text-[14px] font-[500] transition-opacity active:opacity-70"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-[14px] text-[14px] font-[500] transition-all hover:brightness-[0.92] active:opacity-70 dark:hover:brightness-[1.1]"
             style={{
               border: "1.5px dashed var(--mr-edge-strong)",
               color: "var(--mr-dim)",
@@ -146,6 +165,49 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
           </button>
         )}
       </div>
+
+      {/* Rename Vault Modal */}
+      <Modal
+        open={showRenameModal}
+        onOpenChange={(open) => {
+          setShowRenameModal(open);
+          if (!open) setRenameValue("");
+        }}
+        title="Rename vault"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <Input
+            placeholder="Vault name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && renameValue.trim()) {
+                updateVaultName(renameValue.trim());
+                setShowRenameModal(false);
+                setRenameValue("");
+              }
+            }}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!renameValue.trim()}
+              onClick={() => {
+                if (!renameValue.trim()) return;
+                updateVaultName(renameValue.trim());
+                setShowRenameModal(false);
+                setRenameValue("");
+              }}
+            >
+              Rename
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

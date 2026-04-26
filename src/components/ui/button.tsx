@@ -62,7 +62,7 @@ export function Button({
       disabled={disabled}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-[120ms] select-none",
-        "active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        "hover:border-black/50! hover:brightness-95 active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:hover:brightness-110",
         sizeStyles[size],
         fullWidth && "w-full",
         className,

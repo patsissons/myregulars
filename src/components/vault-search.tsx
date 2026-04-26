@@ -162,7 +162,7 @@ export function VaultSearch({ vaultId, className }: VaultSearchProps) {
                 key={person.id}
                 type="button"
                 onClick={() => handleSelect(location.id, person.id)}
-                className="flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors duration-75 hover:opacity-80"
+                className="hover:bg-mr-subtle flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors duration-75"
                 style={{ borderTop: "1px solid var(--mr-edge)" }}
               >
                 <span className="text-[13px]" style={{ color: "var(--mr-text)" }}>

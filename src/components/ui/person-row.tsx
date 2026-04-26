@@ -56,7 +56,7 @@ export function PersonRow({ person, onClick, onLog, isReadOnly, className }: Per
 
   function handleDragMove(clientX: number) {
     if (!isDraggingRef.current || !canSwipe) return;
-    const delta = Math.max(0, Math.min(120, clientX - startXRef.current));
+    const delta = Math.max(0, Math.min(180, clientX - startXRef.current));
     currentXRef.current = delta;
     applyTranslate(delta);
   }
@@ -96,6 +96,7 @@ export function PersonRow({ person, onClick, onLog, isReadOnly, className }: Per
       {/* Main row */}
       <div
         ref={rowRef}
+        className="relative"
         style={{ background: "var(--mr-panel)" }}
         onTouchStart={(e) => handleDragStart(e.touches[0]!.clientX)}
         onTouchMove={(e) => handleDragMove(e.touches[0]!.clientX)}

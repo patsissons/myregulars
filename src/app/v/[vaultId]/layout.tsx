@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Moon, MoreHorizontal, Plus, Sun } from "lucide-react";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -31,7 +32,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { vault, isSyncing, isReadOnly, addLocation, cloneVault } = useVault();
+  const { vault, isSyncing, isReadOnly, addLocation, cloneVault, updateVaultName } = useVault();
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
@@ -44,6 +45,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const [cloneName, setCloneName] = useState("");
   const [isCloning, setIsCloning] = useState(false);
   const [cloneError, setCloneError] = useState("");
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   // Parse active locationId from URL
   const locationMatch = pathname.match(/\/v\/[^/]+\/l\/([^/]+)/);
@@ -71,6 +74,13 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     setShowNewPlaceModal(false);
     setNewPlaceName("");
     setNewPlaceDesc("");
+  }
+
+  function handleRenameVault() {
+    if (!renameValue.trim()) return;
+    updateVaultName(renameValue.trim());
+    setShowRenameModal(false);
+    setRenameValue("");
   }
 
   async function handleClone() {
@@ -130,7 +140,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           <button
             type="button"
             onClick={openShare}
-            className="flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[12px] font-[500] transition-opacity hover:opacity-70"
+            className="flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[12px] font-[500] transition-all hover:border-black/50! hover:brightness-[0.92] dark:hover:brightness-[1.1]"
             style={{
               background: "var(--mr-subtle)",
               border: "1px solid var(--mr-edge)",
@@ -143,7 +153,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
             aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           >
             {theme === "dark" ? (
@@ -153,13 +163,27 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
             )}
           </button>
 
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
-            aria-label="More options"
-          >
-            <MoreHorizontal size={15} style={{ color: "var(--mr-dim)" }} />
-          </button>
+          <DropdownMenu
+            items={[
+              {
+                label: "Rename vault",
+                onClick: () => {
+                  setRenameValue(vault?.name ?? "");
+                  setShowRenameModal(true);
+                },
+              },
+              { label: "Close vault", onClick: () => router.push("/vaults") },
+            ]}
+            trigger={
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={15} style={{ color: "var(--mr-dim)" }} />
+              </button>
+            }
+          />
         </div>
       </div>
 
@@ -219,7 +243,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
               <button
                 type="button"
                 onClick={() => setShowNewPlaceModal(true)}
-                className="flex w-full items-center gap-1.5 rounded-[7px] px-[7px] py-[7px] text-left text-[13px] transition-opacity hover:opacity-70"
+                className="flex w-full items-center gap-1.5 rounded-[7px] px-[7px] py-[7px] text-left text-[13px] transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
                 style={{ color: "var(--mr-dim)" }}
               >
                 <Plus size={13} style={{ flexShrink: 0 }} />
@@ -240,7 +264,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
                     key={person.id}
                     type="button"
                     onClick={() => router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)}
-                    className="flex w-full items-center gap-2 rounded-[7px] px-[7px] py-[5px] text-left transition-opacity hover:opacity-70"
+                    className="flex w-full items-center gap-2 rounded-[7px] px-[7px] py-[5px] text-left transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
                   >
                     <Avatar name={person.name} size={20} photoUrl={person.photoUrl} />
                     <span
@@ -299,6 +323,34 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
             </Button>
             <Button variant="primary" onClick={handleAddPlace} disabled={!newPlaceName.trim()}>
               Add place
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Rename Vault Modal */}
+      <Modal
+        open={showRenameModal}
+        onOpenChange={(open) => {
+          setShowRenameModal(open);
+          if (!open) setRenameValue("");
+        }}
+        title="Rename vault"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <Input
+            placeholder="Vault name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRenameVault()}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleRenameVault} disabled={!renameValue.trim()}>
+              Rename
             </Button>
           </div>
         </div>

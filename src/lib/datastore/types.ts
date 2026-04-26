@@ -49,6 +49,7 @@ export interface Location {
 export interface MyRegularsDocument {
   app: "myregulars";
   schemaVersion: 1;
+  name?: string;
   updatedAt: string;
   data: {
     locations: Location[];
@@ -66,6 +67,7 @@ export interface DatastoreSnapshot {
   version: string;
   uri: DatastoreUri;
   source: "remote" | "cache";
+  vaultFileName?: string;
 }
 
 export interface VersionInfo {

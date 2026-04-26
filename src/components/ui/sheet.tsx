@@ -65,6 +65,7 @@ export function Sheet({ open, onOpenChange, title, children, className }: SheetP
               >
                 {title}
               </Dialog.Title>
+              <Dialog.Description />
             </div>
           )}
           <div style={{ overflowY: "auto", flex: 1 }}>{children}</div>

@@ -19,11 +19,11 @@ export function LocationRow({ location, active, onClick, className }: LocationRo
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2 rounded-[7px] px-[7px] py-[7px] text-left transition-colors duration-100",
-        "active:opacity-80",
+        "hover:bg-mr-subtle active:opacity-70",
         className,
       )}
       style={{
-        background: active ? "var(--mr-accent-soft)" : "transparent",
+        ...(active ? { background: "var(--mr-accent-soft)" } : {}),
         color: active ? "var(--mr-accent)" : "var(--mr-text)",
       }}
       aria-current={active ? "page" : undefined}

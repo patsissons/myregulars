@@ -1,4 +1,29 @@
+import { DATASTORE_APP_NAME, DATASTORE_FILE_NAME } from "@/lib/datastore/constants";
 import type { Group, Location, Person } from "@/lib/datastore/types";
+
+export function sanitizeVaultName(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "vault"
+  );
+}
+
+export function buildVaultFileName(vaultName: string): string {
+  return `${DATASTORE_APP_NAME}.${sanitizeVaultName(vaultName)}.json`;
+}
+
+export function extractVaultNameFromFileName(fileName: string): string | null {
+  if (fileName === DATASTORE_FILE_NAME) return null;
+  const match = fileName.match(/^[^.]+\.(.+)\.json$/);
+  if (!match) return null;
+  return match[1]
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 export function generateId(): string {
   return crypto.randomUUID();

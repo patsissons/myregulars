@@ -2,6 +2,7 @@ import { GistStorageAdapter } from "@/lib/datastore/gist-adapter";
 import { beginGitHubAuth as startGitHubAuth, getGitHubAuthToken } from "@/lib/datastore/auth";
 import { createDatastoreCache } from "@/lib/datastore/cache";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
+import { buildVaultFileName } from "@/lib/datastore/helpers";
 import { withUpdatedTimestamp } from "@/lib/datastore/schema";
 import { resolveDatastoreConnection } from "@/lib/datastore/uri";
 import type {
@@ -14,8 +15,8 @@ import type {
 
 const datastoreCache = createDatastoreCache();
 
-function createAdapter(authToken?: string | null): GistStorageAdapter {
-  return new GistStorageAdapter({ authToken });
+function createAdapter(authToken?: string | null, fileName?: string): GistStorageAdapter {
+  return new GistStorageAdapter({ authToken, fileName });
 }
 
 async function cacheSnapshot(snapshot: DatastoreSnapshot): Promise<DatastoreSnapshot> {
@@ -34,9 +35,10 @@ export async function beginGitHubAuthFlow(): Promise<string> {
 
 export const beginGitHubAuth = beginGitHubAuthFlow;
 
-export async function createDatastore(): Promise<DatastoreSnapshot> {
+export async function createDatastore(vaultName?: string): Promise<DatastoreSnapshot> {
   const authToken = getGitHubAuthToken();
-  const adapter = createAdapter(authToken);
+  const fileName = vaultName ? buildVaultFileName(vaultName) : undefined;
+  const adapter = createAdapter(authToken, fileName);
   const created = await adapter.create();
 
   return cacheSnapshot({
@@ -66,6 +68,7 @@ export async function loadDatastore(uri: string): Promise<DatastoreSnapshot> {
       version: latest.version,
       uri: connection.uri,
       source: "remote",
+      vaultFileName: adapter.getVaultFileName() ?? undefined,
     });
   } catch (error) {
     const cached = await datastoreCache.get(connection.uri);

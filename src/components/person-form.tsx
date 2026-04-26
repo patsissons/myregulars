@@ -26,10 +26,11 @@ interface PersonFormProps {
 
 export function PersonForm({ config, onClose }: PersonFormProps) {
   const { mode, location, locationId, person } = config;
-  const { addGroup, addPerson, updatePerson, deletePerson } = useVault();
+  const { vault, addGroup, addPerson, updatePerson, deletePerson, movePerson } = useVault();
   const { showToast } = useToast();
 
-  const initialGroupId = config.groupId ?? location.groups[0]?.id ?? null;
+  const liveLocation = vault?.locations.find((l) => l.id === locationId) ?? location;
+  const initialGroupId = config.groupId ?? liveLocation.groups[0]?.id ?? null;
 
   const [name, setName] = useState(person?.name ?? "");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId);
@@ -70,8 +71,8 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
     let groupId = selectedGroupId;
 
     // If no group is selected but the location has groups, use the first
-    if (!groupId && location.groups.length > 0) {
-      groupId = location.groups[0].id;
+    if (!groupId && liveLocation.groups.length > 0) {
+      groupId = liveLocation.groups[0].id;
     }
 
     // If still no group, create a default "Regulars" group
@@ -95,7 +96,12 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
       });
       showToast("Person added");
     } else if (person && config.groupId) {
-      updatePerson(locationId, config.groupId, person.id, personData);
+      if (groupId && groupId !== config.groupId) {
+        movePerson(locationId, config.groupId, groupId, person.id);
+        updatePerson(locationId, groupId, person.id, personData);
+      } else {
+        updatePerson(locationId, config.groupId, person.id, personData);
+      }
       showToast("Person updated");
     }
 
@@ -138,7 +144,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
           Group
         </p>
         <div className="flex flex-wrap gap-2">
-          {location.groups.map((g) => (
+          {liveLocation.groups.map((g) => (
             <Chip
               key={g.id}
               active={selectedGroupId === g.id}
@@ -223,7 +229,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
         <button
           type="button"
           onClick={() => setShowPhotoField(true)}
-          className="self-start text-[13px] transition-opacity hover:opacity-70"
+          className="self-start text-[13px] transition-opacity hover:opacity-50"
           style={{ color: "var(--mr-accent)" }}
         >
           Add photo
@@ -243,7 +249,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                 <button
                   type="button"
                   onClick={() => setPets((prev) => prev.filter((_, i) => i !== idx))}
-                  className="ml-1.5 transition-opacity hover:opacity-70"
+                  className="ml-1.5 transition-opacity hover:opacity-50"
                   aria-label={`Remove ${pet.name}`}
                 >
                   <X size={12} />
