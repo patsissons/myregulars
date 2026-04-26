@@ -80,7 +80,10 @@ export default function PersonPage({
       </div>
 
       {/* ─── Mobile: full-screen person detail ─── */}
-      <div className="flex min-h-screen flex-col lg:hidden" style={{ background: "var(--mr-bg)" }}>
+      <div
+        className="flex min-h-screen flex-col lg:hidden"
+        style={{ background: "var(--mr-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         {/* Mobile header */}
         <div
           className="flex shrink-0 items-center justify-between px-4 pt-4 pb-3"
@@ -88,7 +91,7 @@ export default function PersonPage({
         >
           <button
             type="button"
-            onClick={handleClose}
+            onClick={() => router.back()}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
             aria-label="Back"
           >

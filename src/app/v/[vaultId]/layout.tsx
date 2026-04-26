@@ -16,6 +16,7 @@ import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
 import { useShareDialog } from "@/components/share-dialog";
+import { LayoutTransition } from "@/components/layout-transition";
 import { VaultLoader } from "./vault-loader";
 
 interface VaultShellProps {
@@ -282,7 +283,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
 
         {/* Center + right rail */}
         <div className="flex min-w-0 flex-1">
-          <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+          <LayoutTransition className="min-w-0 flex-1 overflow-y-auto">{children}</LayoutTransition>
         </div>
       </div>
 

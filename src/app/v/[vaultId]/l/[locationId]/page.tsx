@@ -18,7 +18,7 @@ export default function LocationPage({
 }) {
   const { vaultId, locationId } = use(params);
   const router = useRouter();
-  const { vault, isReadOnly } = useVault();
+  const { vault, isReadOnly, logVisit } = useVault();
   const { openAdd, DialogComponent } = usePersonFormDialog();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -73,8 +73,11 @@ export default function LocationPage({
 
       {/* ─── Mobile layout ─── */}
       <div
-        className="flex min-h-screen flex-col pb-24 lg:hidden"
-        style={{ background: "var(--mr-bg)" }}
+        className="flex min-h-screen flex-col lg:hidden"
+        style={{
+          background: "var(--mr-bg)",
+          paddingBottom: "calc(96px + env(safe-area-inset-bottom))",
+        }}
       >
         {/* Mobile header */}
         <div
@@ -83,7 +86,7 @@ export default function LocationPage({
         >
           <button
             type="button"
-            onClick={() => router.push(`/v/${vaultId}`)}
+            onClick={() => router.back()}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
             aria-label="Back"
           >
@@ -174,7 +177,9 @@ export default function LocationPage({
                     <PersonRow
                       key={person.id}
                       person={person}
+                      isReadOnly={isReadOnly}
                       onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
+                      onLog={() => logVisit(locationId, group.id, person.id)}
                     />
                   ))}
                 </div>
