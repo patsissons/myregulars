@@ -1,6 +1,14 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Input } from "@/components/ui/input";
+import { PersonCard } from "@/components/ui/person-card";
+import { PersonRow } from "@/components/ui/person-row";
 import { useVault } from "@/lib/vault-context";
 
 export default function LocationPage({
@@ -8,15 +16,19 @@ export default function LocationPage({
 }: {
   params: Promise<{ vaultId: string; locationId: string }>;
 }) {
-  const { locationId } = use(params);
-  const { vault } = useVault();
+  const { vaultId, locationId } = use(params);
+  const router = useRouter();
+  const { vault, isReadOnly } = useVault();
+
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const location = vault?.locations.find((l) => l.id === locationId);
 
   if (!location) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex min-h-[60vh] items-center justify-center"
         style={{ background: "var(--mr-bg)" }}
       >
         <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
@@ -26,14 +38,284 @@ export default function LocationPage({
     );
   }
 
+  const totalPeople = location.groups.flatMap((g) => g.people).length;
+
+  // Filter groups/people based on active chip and search
+  const visibleGroups = location.groups
+    .filter((g) => activeGroupId === null || g.id === activeGroupId)
+    .map((g) => ({
+      ...g,
+      people: g.people.filter((p) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
+      }),
+    }))
+    .filter((g) => g.people.length > 0);
+
+  const hasResults = visibleGroups.some((g) => g.people.length > 0);
+  const hasSearch = search.length > 0;
+
+  function handleAddPerson() {
+    // Placeholder — will be wired to Add Person modal in Task 11
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ background: "var(--mr-bg)" }}
-    >
-      <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
-        {location.name} — location detail coming soon.
-      </span>
-    </div>
+    <>
+      {/* ─── Desktop center pane ─── */}
+      <div className="hidden flex-col lg:flex" style={{ minHeight: "100%" }}>
+        {/* Header */}
+        <div
+          className="shrink-0 px-8 pt-[22px] pb-0"
+          style={{ borderBottom: "1px solid var(--mr-edge)" }}
+        >
+          <div className="mb-3 flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <Eyebrow className="mb-1 block">Place</Eyebrow>
+              <h1
+                style={{
+                  fontSize: 26,
+                  fontWeight: 600,
+                  letterSpacing: "-0.025em",
+                  color: "var(--mr-text)",
+                  lineHeight: 1.1,
+                }}
+              >
+                {location.name}
+              </h1>
+              <p className="mt-1 text-[13px]" style={{ color: "var(--mr-dim)" }}>
+                {location.description ? `${location.description} · ` : ""}
+                {totalPeople} {totalPeople === 1 ? "person" : "people"}
+              </p>
+            </div>
+
+            {/* Right: search + add button */}
+            <div className="flex shrink-0 items-center gap-2 pt-1">
+              <div className="relative">
+                <Search
+                  size={13}
+                  className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+                  style={{ color: "var(--mr-faint)" }}
+                />
+                <Input
+                  placeholder="Search people"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-[220px] pl-[30px]"
+                />
+              </div>
+              {!isReadOnly && (
+                <Button variant="primary" size="md" onClick={handleAddPerson}>
+                  <Plus size={14} />
+                  Add person
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Group filter chips */}
+          <div className="flex gap-2 overflow-x-auto pb-3">
+            <Chip active={activeGroupId === null} onClick={() => setActiveGroupId(null)}>
+              All
+            </Chip>
+            {location.groups.map((g) => (
+              <Chip
+                key={g.id}
+                active={activeGroupId === g.id}
+                onClick={() => setActiveGroupId(g.id)}
+              >
+                {g.name}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {/* People grid */}
+        <div className="flex-1 p-5">
+          {!hasResults && hasSearch ? (
+            <div className="flex items-center justify-center py-16">
+              <p className="text-[14px]" style={{ color: "var(--mr-faint)" }}>
+                No matches for &ldquo;{search}&rdquo;
+              </p>
+            </div>
+          ) : !hasResults ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <p className="text-[14px]" style={{ color: "var(--mr-faint)" }}>
+                No people here yet.
+              </p>
+              {!isReadOnly && (
+                <Button variant="primary" size="md" onClick={handleAddPerson}>
+                  <Plus size={14} />
+                  Add person
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {visibleGroups.map((group) => (
+                <div key={group.id}>
+                  <div className="mb-3">
+                    <Eyebrow>
+                      {group.name} · {group.people.length}
+                    </Eyebrow>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {group.people.map((person) => (
+                      <PersonCard
+                        key={person.id}
+                        person={person}
+                        onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Mobile layout ─── */}
+      <div
+        className="flex min-h-screen flex-col pb-24 lg:hidden"
+        style={{ background: "var(--mr-bg)" }}
+      >
+        {/* Mobile header */}
+        <div
+          className="flex items-center justify-between px-4 pt-4 pb-3"
+          style={{ borderBottom: "1px solid var(--mr-edge)" }}
+        >
+          <button
+            type="button"
+            onClick={() => router.push(`/v/${vaultId}`)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            aria-label="Back"
+          >
+            <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
+          </button>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+            aria-label="More options"
+          >
+            <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
+          </button>
+        </div>
+
+        {/* Location info */}
+        <div className="px-5 pt-5 pb-4">
+          <Eyebrow className="mb-2 block">Place</Eyebrow>
+          <h1
+            className="mb-1"
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              letterSpacing: "-0.025em",
+              color: "var(--mr-text)",
+            }}
+          >
+            {location.name}
+          </h1>
+          {location.description && (
+            <p className="text-[14px]" style={{ color: "var(--mr-dim)" }}>
+              {location.description}
+            </p>
+          )}
+
+          {/* Mobile search */}
+          <div className="relative mt-4">
+            <Search
+              size={13}
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+              style={{ color: "var(--mr-faint)" }}
+            />
+            <Input
+              placeholder="Search people"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Group filter pills — horizontal scroll */}
+          <div className="mt-3 flex gap-2 overflow-x-auto">
+            <Chip active={activeGroupId === null} onClick={() => setActiveGroupId(null)}>
+              All
+            </Chip>
+            {location.groups.map((g) => (
+              <Chip
+                key={g.id}
+                active={activeGroupId === g.id}
+                onClick={() => setActiveGroupId(g.id)}
+              >
+                {g.name}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {/* People sections */}
+        <div className="flex flex-col gap-6 px-5">
+          {!hasResults && hasSearch ? (
+            <p className="py-8 text-center text-[14px]" style={{ color: "var(--mr-faint)" }}>
+              No matches for &ldquo;{search}&rdquo;
+            </p>
+          ) : !hasResults ? (
+            <p className="py-8 text-center text-[14px]" style={{ color: "var(--mr-faint)" }}>
+              No people here yet.
+            </p>
+          ) : (
+            visibleGroups.map((group) => (
+              <div key={group.id}>
+                <Eyebrow className="mb-2 block">
+                  {group.name} · {group.people.length}
+                </Eyebrow>
+                <div
+                  className="flex flex-col overflow-hidden rounded-[14px] px-4"
+                  style={{ background: "var(--mr-panel)", border: "1px solid var(--mr-edge)" }}
+                >
+                  {group.people.map((person) => (
+                    <PersonRow
+                      key={person.id}
+                      person={person}
+                      onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* FAB — mobile only, add person */}
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={handleAddPerson}
+            className="fixed flex items-center gap-2 text-[14px] font-[500] transition-opacity active:opacity-70"
+            style={{
+              right: 22,
+              bottom: 32,
+              height: 54,
+              borderRadius: 28,
+              padding: "0 20px",
+              background: "var(--mr-text)",
+              color: "var(--mr-bg)",
+              boxShadow: "0 14px 30px rgba(0,0,0,0.22)",
+            }}
+            aria-label="Add person"
+          >
+            <Plus size={18} />
+            Add person
+          </button>
+        )}
+      </div>
+    </>
   );
 }
