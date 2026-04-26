@@ -16,8 +16,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MyRegulars",
+  title: {
+    default: "MyRegulars",
+    template: "%s | MyRegulars",
+  },
   description: "Remember the people at the places you go.",
+  applicationName: "MyRegulars",
+  openGraph: {
+    type: "website",
+    siteName: "MyRegulars",
+    title: "MyRegulars",
+    description: "Remember the people at the places you go.",
+  },
+  twitter: {
+    card: "summary",
+    title: "MyRegulars",
+    description: "Remember the people at the places you go.",
+  },
 };
 
 export const viewport: Viewport = {
