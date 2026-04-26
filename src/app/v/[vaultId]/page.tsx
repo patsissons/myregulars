@@ -9,11 +9,13 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useVault } from "@/lib/vault-context";
+import { useVaultDataDialog } from "@/components/vault-data-dialog";
 
 export default function VaultPage({ params }: { params: Promise<{ vaultId: string }> }) {
   const { vaultId } = use(params);
   const router = useRouter();
   const { vault, isReadOnly, addLocation, updateVaultName } = useVault();
+  const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -58,6 +60,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
                 setShowRenameModal(true);
               },
             },
+            { label: "View vault data", onClick: openVaultData },
             { label: "Close vault", onClick: () => router.push("/vaults") },
           ]}
           trigger={
@@ -208,6 +211,8 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
           </div>
         </div>
       </Modal>
+
+      {VaultDataDialogComponent}
     </div>
   );
 }

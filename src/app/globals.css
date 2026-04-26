@@ -19,6 +19,11 @@
   --mr-danger: #c94a3b;
   --mr-overlay: rgba(20, 20, 20, 0.42);
   --mr-success: #2da57a;
+  /* JSON syntax highlighting (light) */
+  --mr-json-key: #7c3aed;
+  --mr-json-string: #059669;
+  --mr-json-number: #d97706;
+  --mr-json-keyword: #dc2626;
   /* Avatar hue-derived colors (light) */
   --avatar-bg-l: 0.92;
   --avatar-fg-l: 0.3;
@@ -42,6 +47,11 @@
   --mr-chip-text: #dcdcdc;
   --mr-danger: #f08272;
   --mr-overlay: rgba(0, 0, 0, 0.55);
+  /* JSON syntax highlighting (dark) */
+  --mr-json-key: #c4b5fd;
+  --mr-json-string: #6ee7b7;
+  --mr-json-number: #fbbf24;
+  --mr-json-keyword: #fca5a5;
   /* Avatar hue-derived colors (dark) */
   --avatar-bg-l: 0.32;
   --avatar-fg-l: 0.86;

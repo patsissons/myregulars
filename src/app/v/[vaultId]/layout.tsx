@@ -19,6 +19,7 @@ import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { useShareDialog } from "@/components/share-dialog";
+import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { LayoutTransition } from "@/components/layout-transition";
 import { VaultSearch } from "@/components/vault-search";
 import { VaultLoader } from "./vault-loader";
@@ -37,6 +38,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const { showToast } = useToast();
 
   const { openShare, ShareDialogComponent } = useShareDialog();
+  const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
 
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
   const [newPlaceName, setNewPlaceName] = useState("");
@@ -172,6 +174,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
                   setShowRenameModal(true);
                 },
               },
+              { label: "View vault data", onClick: openVaultData },
               { label: "Close vault", onClick: () => router.push("/vaults") },
             ]}
             trigger={
@@ -400,6 +403,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
       </Modal>
 
       {ShareDialogComponent}
+      {VaultDataDialogComponent}
     </div>
   );
 }
