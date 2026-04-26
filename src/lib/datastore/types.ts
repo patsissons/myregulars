@@ -76,6 +76,13 @@ export interface VersionInfo {
   label: string;
 }
 
+export interface DiscoveredVault {
+  uri: DatastoreUri;
+  name: string | null;
+  fileName: string;
+  updatedAt: string;
+}
+
 export interface StorageAdapter<TDocument> {
   connect(uri: string): Promise<void>;
   create(): Promise<{ uri: DatastoreUri; data: TDocument; version: string }>;
@@ -83,5 +90,6 @@ export interface StorageAdapter<TDocument> {
   readVersion(version: string): Promise<{ data: TDocument; version: string }>;
   write(data: TDocument): Promise<string>;
   listVersions(): Promise<VersionInfo[]>;
+  discover(): Promise<DiscoveredVault[]>;
   getUri(): DatastoreUri;
 }

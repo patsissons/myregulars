@@ -5,14 +5,16 @@ import {
 } from "@/lib/datastore/constants";
 import { AuthRequiredError, DatastoreValidationError } from "@/lib/datastore/errors";
 import { clearGitHubAuthToken } from "@/lib/datastore/auth";
+import { extractVaultNameFromFileName } from "@/lib/datastore/helpers";
 import {
   createEmptyDocument,
   parseDocumentString,
   serializeDocument,
 } from "@/lib/datastore/schema";
-import { getGistIdFromUri, normalizeDatastoreUri } from "@/lib/datastore/uri";
+import { formatDatastoreUri, getGistIdFromUri, normalizeDatastoreUri } from "@/lib/datastore/uri";
 import type {
   DatastoreUri,
+  DiscoveredVault,
   MyRegularsDocument,
   StorageAdapter,
   VersionInfo,
@@ -36,6 +38,12 @@ interface GistResponse {
 interface GistCommitResponse {
   version: string;
   committed_at: string;
+}
+
+interface GistListItem {
+  id: string;
+  files: Record<string, { filename: string } | undefined>;
+  updated_at: string;
 }
 
 interface GistStorageAdapterOptions {
@@ -233,6 +241,66 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     }
 
     return allVersions;
+  }
+
+  async discover(): Promise<DiscoveredVault[]> {
+    const authToken = requireAuthToken(this.authToken);
+    const candidates: {
+      id: string;
+      fileName: string;
+      updatedAt: string;
+    }[] = [];
+    let url: string | null = `${GITHUB_GISTS_API_URL}?per_page=100`;
+
+    while (url) {
+      const response = await this.fetchImpl(url, {
+        headers: buildHeaders(authToken),
+      });
+      const gists = await parseJsonResponse<GistListItem[]>(response);
+
+      for (const gist of gists) {
+        const matchingFile = Object.keys(gist.files).find(
+          (name) => name === DATASTORE_FILE_NAME || DATASTORE_FILE_PATTERN.test(name),
+        );
+
+        if (matchingFile) {
+          candidates.push({
+            id: gist.id,
+            fileName: matchingFile,
+            updatedAt: gist.updated_at,
+          });
+        }
+      }
+
+      url = parseLinkNext(response.headers.get("link"));
+    }
+
+    // Fetch each gist to read the document name field
+    const vaults = await Promise.all(
+      candidates.map(async (candidate) => {
+        let documentName: string | null = null;
+
+        try {
+          const response = await this.fetchImpl(`${GITHUB_GISTS_API_URL}/${candidate.id}`, {
+            headers: buildHeaders(authToken),
+          });
+          const gist = await parseJsonResponse<GistResponse>(response);
+          const { document } = readManagedFile(gist);
+          documentName = document.name?.trim() || null;
+        } catch {
+          // Fall back to filename-derived name
+        }
+
+        return {
+          uri: formatDatastoreUri(candidate.id),
+          name: documentName ?? extractVaultNameFromFileName(candidate.fileName),
+          fileName: candidate.fileName,
+          updatedAt: candidate.updatedAt,
+        };
+      }),
+    );
+
+    return vaults;
   }
 
   getUri(): DatastoreUri {

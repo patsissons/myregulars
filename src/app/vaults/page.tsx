@@ -11,7 +11,8 @@ import { Modal } from "@/components/ui/modal";
 import { VaultCard, NewVaultCard } from "@/components/vault-card";
 import { useAuth } from "@/lib/auth-context";
 import { VaultProvider, useVault } from "@/lib/vault-context";
-import { getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
+import { discoverDatastores } from "@/lib/db";
+import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
 import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
 import type { DatastoreUri } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
@@ -24,11 +25,52 @@ function VaultsContent() {
   const [vaults, setVaults] = useState<KnownVault[]>(() =>
     typeof localStorage !== "undefined" ? getKnownVaults() : [],
   );
+  const [isDiscovering, setIsDiscovering] = useState(true);
   const [showNewVaultModal, setShowNewVaultModal] = useState(false);
   const [newVaultName, setNewVaultName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    discoverDatastores()
+      .then((discovered) => {
+        if (cancelled) return;
+        setVaults((prev) => {
+          const knownUris = new Set(prev.map((v) => v.uri));
+          const newVaults: KnownVault[] = [];
+
+          for (const vault of discovered) {
+            if (!knownUris.has(vault.uri)) {
+              const newVault: KnownVault = {
+                uri: vault.uri,
+                name: vault.name ?? `Vault ${getGistIdFromUri(vault.uri).slice(0, 6)}`,
+                lastOpened: vault.updatedAt,
+                peopleCount: 0,
+                locationCount: 0,
+              };
+              addKnownVault(newVault);
+              newVaults.push(newVault);
+            }
+          }
+
+          if (newVaults.length === 0) return prev;
+          return [...prev, ...newVaults];
+        });
+      })
+      .catch(() => {
+        // Discovery is best-effort — don't block the page on failure
+      })
+      .finally(() => {
+        if (!cancelled) setIsDiscovering(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleDeleteVault(uri: DatastoreUri) {
     removeKnownVault(uri);
@@ -89,9 +131,14 @@ function VaultsContent() {
 
         {/* Vault grid */}
         <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
-          {vaults.length === 0 && (
+          {vaults.length === 0 && !isDiscovering && (
             <p className="col-span-full mb-4 text-[14px]" style={{ color: "var(--mr-dim)" }}>
               Welcome. Start your first notebook.
+            </p>
+          )}
+          {isDiscovering && vaults.length === 0 && (
+            <p className="col-span-full mb-4 text-[14px]" style={{ color: "var(--mr-dim)" }}>
+              Looking for existing vaults…
             </p>
           )}
           {vaults.map((vault) => (

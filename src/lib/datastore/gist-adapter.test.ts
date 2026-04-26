@@ -218,6 +218,143 @@ describe("GistStorageAdapter", () => {
     await expect(adapter.write(createEmptyDocument())).rejects.toThrow(AuthRequiredError);
   });
 
+  it("discovers myregulars vaults and uses document name over filename", async () => {
+    const docWithName = createEmptyDocument(new Date("2026-04-20T10:00:00.000Z"));
+    (docWithName as { name?: string }).name = "My Coffee Shop";
+    const docWithoutName = createEmptyDocument(new Date("2026-04-21T10:00:00.000Z"));
+
+    // List gists response
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: "gist1",
+          files: { "myregulars.json": { filename: "myregulars.json" } },
+          updated_at: "2026-04-20T10:00:00.000Z",
+        },
+        {
+          id: "gist2",
+          files: { "myregulars.home.json": { filename: "myregulars.home.json" } },
+          updated_at: "2026-04-21T10:00:00.000Z",
+        },
+        {
+          id: "gist3",
+          files: { "random-notes.md": { filename: "random-notes.md" } },
+          updated_at: "2026-04-22T10:00:00.000Z",
+        },
+      ]),
+    );
+    // Individual gist fetches — gist1 has document name, gist2 does not
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "gist1",
+        files: { "myregulars.json": { content: JSON.stringify(docWithName) } },
+        history: [{ version: "sha1", committed_at: "2026-04-20T10:00:00.000Z" }],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "gist2",
+        files: { "myregulars.home.json": { content: JSON.stringify(docWithoutName) } },
+        history: [{ version: "sha2", committed_at: "2026-04-21T10:00:00.000Z" }],
+      }),
+    );
+
+    const adapter = new GistStorageAdapter({
+      authToken: "token",
+      fetchImpl: fetchMock,
+    });
+
+    const vaults = await adapter.discover();
+
+    expect(vaults).toEqual([
+      {
+        uri: "gist:gist1",
+        name: "My Coffee Shop",
+        fileName: "myregulars.json",
+        updatedAt: "2026-04-20T10:00:00.000Z",
+      },
+      {
+        uri: "gist:gist2",
+        name: "Home",
+        fileName: "myregulars.home.json",
+        updatedAt: "2026-04-21T10:00:00.000Z",
+      },
+    ]);
+    // 1 list call + 2 individual gist fetches
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("paginates discover results using Link header", async () => {
+    const doc1 = createEmptyDocument(new Date("2026-04-20T10:00:00.000Z"));
+    (doc1 as { name?: string }).name = "Downtown";
+    const doc2 = createEmptyDocument(new Date("2026-04-21T10:00:00.000Z"));
+    (doc2 as { name?: string }).name = "Office";
+
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "gist1",
+              files: { "myregulars.json": { filename: "myregulars.json" } },
+              updated_at: "2026-04-20T10:00:00.000Z",
+            },
+          ]),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              link: '<https://api.github.com/gists?per_page=100&page=2>; rel="next"',
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: "gist2",
+            files: { "myregulars.work.json": { filename: "myregulars.work.json" } },
+            updated_at: "2026-04-21T10:00:00.000Z",
+          },
+        ]),
+      )
+      // Individual gist fetches
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "gist1",
+          files: { "myregulars.json": { content: JSON.stringify(doc1) } },
+          history: [{ version: "sha1", committed_at: "2026-04-20T10:00:00.000Z" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "gist2",
+          files: { "myregulars.work.json": { content: JSON.stringify(doc2) } },
+          history: [{ version: "sha2", committed_at: "2026-04-21T10:00:00.000Z" }],
+        }),
+      );
+
+    const adapter = new GistStorageAdapter({
+      authToken: "token",
+      fetchImpl: fetchMock,
+    });
+
+    const vaults = await adapter.discover();
+
+    expect(vaults).toHaveLength(2);
+    expect(vaults[0].uri).toBe("gist:gist1");
+    expect(vaults[0].name).toBe("Downtown");
+    expect(vaults[1].uri).toBe("gist:gist2");
+    expect(vaults[1].name).toBe("Office");
+    // 2 list pages + 2 individual gist fetches
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("requires auth for discover", async () => {
+    const adapter = new GistStorageAdapter({ fetchImpl: fetchMock });
+    await expect(adapter.discover()).rejects.toThrow(AuthRequiredError);
+  });
+
   it("clears stored token and throws AuthRequiredError on 401", async () => {
     localStorage.setItem("myregulars:github-auth-token", "stale-token");
 

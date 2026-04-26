@@ -9,6 +9,7 @@ import type {
   DatastoreConnection,
   DatastoreSnapshot,
   DatastoreUri,
+  DiscoveredVault,
   MyRegularsDocument,
   VersionInfo,
 } from "@/lib/datastore/types";
@@ -135,6 +136,12 @@ export async function listDatastoreVersions(uri: string): Promise<VersionInfo[]>
   await adapter.connect(connection.uri);
   datastoreCache.setPreferredUri(connection.uri);
   return adapter.listVersions();
+}
+
+export async function discoverDatastores(): Promise<DiscoveredVault[]> {
+  const authToken = getGitHubAuthToken();
+  const adapter = createAdapter(authToken);
+  return adapter.discover();
 }
 
 export function getPreferredDatastoreUri(): DatastoreUri | null {

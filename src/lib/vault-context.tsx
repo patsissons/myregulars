@@ -198,7 +198,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const nameFromDocument = snapshot.document.name;
       const vault: Vault = {
         name:
-          existingVault?.name ?? nameFromDocument ?? nameFromFile ?? `Vault ${gistId.slice(0, 6)}`,
+          nameFromDocument ?? existingVault?.name ?? nameFromFile ?? `Vault ${gistId.slice(0, 6)}`,
         locations: snapshot.document.data.locations,
       };
 
