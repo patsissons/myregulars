@@ -1,26 +1,146 @@
 @import "tailwindcss";
 
+/* ─── Design tokens — light theme ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --mr-bg: #fbfbfa;
+  --mr-panel: #ffffff;
+  --mr-subtle: #f6f5f3;
+  --mr-edge: rgba(15, 15, 15, 0.08);
+  --mr-edge-strong: rgba(15, 15, 15, 0.16);
+  --mr-text: #111111;
+  --mr-dim: #6b6b6b;
+  --mr-faint: #9a9a9a;
+  --mr-accent: #3b6cdc;
+  --mr-accent-text: #ffffff;
+  --mr-accent-soft: rgba(59, 108, 220, 0.1);
+  --mr-accent-soft-border: rgba(59, 108, 220, 0.22);
+  --mr-chip: #f1f1ef;
+  --mr-chip-text: #3a3a3a;
+  --mr-danger: #c94a3b;
+  --mr-overlay: rgba(20, 20, 20, 0.42);
+  --mr-success: #2da57a;
 }
 
+/* ─── Design tokens — dark theme ─── */
+.dark {
+  --mr-bg: #0e0e0f;
+  --mr-panel: #17171a;
+  --mr-subtle: #121214;
+  --mr-edge: rgba(255, 255, 255, 0.08);
+  --mr-edge-strong: rgba(255, 255, 255, 0.16);
+  --mr-text: #f3f3f2;
+  --mr-dim: #a0a0a0;
+  --mr-faint: #6a6a6a;
+  --mr-accent: #7ea2ff;
+  --mr-accent-text: #0b0b0c;
+  --mr-accent-soft: rgba(126, 162, 255, 0.14);
+  --mr-accent-soft-border: rgba(126, 162, 255, 0.3);
+  --mr-chip: #222226;
+  --mr-chip-text: #dcdcdc;
+  --mr-danger: #f08272;
+  --mr-overlay: rgba(0, 0, 0, 0.55);
+}
+
+/* ─── Tailwind theme mapping ─── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-mr-bg: var(--mr-bg);
+  --color-mr-panel: var(--mr-panel);
+  --color-mr-subtle: var(--mr-subtle);
+  --color-mr-edge: var(--mr-edge);
+  --color-mr-edge-strong: var(--mr-edge-strong);
+  --color-mr-text: var(--mr-text);
+  --color-mr-dim: var(--mr-dim);
+  --color-mr-faint: var(--mr-faint);
+  --color-mr-accent: var(--mr-accent);
+  --color-mr-accent-text: var(--mr-accent-text);
+  --color-mr-accent-soft: var(--mr-accent-soft);
+  --color-mr-accent-soft-border: var(--mr-accent-soft-border);
+  --color-mr-chip: var(--mr-chip);
+  --color-mr-chip-text: var(--mr-chip-text);
+  --color-mr-danger: var(--mr-danger);
+  --color-mr-overlay: var(--mr-overlay);
+  --color-mr-success: var(--mr-success);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ─── Global base styles ─── */
+body {
+  background: var(--mr-bg);
+  color: var(--mr-text);
+  font-family:
+    var(--font-geist-sans),
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  font-feature-settings: "ss01", "cv11", "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Animation keyframes ─── */
+@keyframes mrSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes mrSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mrSlideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mrFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mrPop {
+  0% {
+    transform: scale(0.92);
+  }
+  70% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes mrSheetIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }

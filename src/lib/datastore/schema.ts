@@ -2,12 +2,56 @@ import { z } from "zod";
 
 import { DATASTORE_APP_NAME, DATASTORE_SCHEMA_VERSION } from "@/lib/datastore/constants";
 import { DatastoreValidationError } from "@/lib/datastore/errors";
-import type { MyRegularsDocument } from "@/lib/datastore/types";
-
-const locationSchema = z.object({}).catchall(z.unknown());
+import type { Group, Location, MyRegularsDocument, Person } from "@/lib/datastore/types";
 
 const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: "Expected a valid ISO-8601 timestamp.",
+});
+
+export const petSchema = z.object({
+  name: z.string(),
+  species: z.string(),
+});
+
+export const visitEntrySchema = z.object({
+  date: isoTimestampSchema,
+  note: z.string().optional(),
+});
+
+export const relationshipSchema = z.object({
+  personId: z.string(),
+  kind: z.string(),
+});
+
+export const personSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  detail: z.string(),
+  photoUrl: z.string().optional(),
+  lastSeen: z.string().optional(),
+  visitLog: z.array(visitEntrySchema).optional(),
+  pets: z.array(petSchema).optional(),
+  relationships: z.array(relationshipSchema).optional(),
+  createdAt: isoTimestampSchema,
+  updatedAt: isoTimestampSchema,
+});
+
+export const groupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  people: z.array(personSchema),
+  createdAt: isoTimestampSchema,
+  updatedAt: isoTimestampSchema,
+});
+
+export const locationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  groups: z.array(groupSchema),
+  createdAt: isoTimestampSchema,
+  updatedAt: isoTimestampSchema,
 });
 
 export const myRegularsDocumentSchema = z.object({
@@ -49,7 +93,7 @@ export function parseDocument(value: unknown): MyRegularsDocument {
     throw new DatastoreValidationError(result.error.message);
   }
 
-  return result.data;
+  return result.data as MyRegularsDocument;
 }
 
 export function parseDocumentString(contents: string): MyRegularsDocument {
@@ -67,3 +111,15 @@ export function parseDocumentString(contents: string): MyRegularsDocument {
 export function serializeDocument(document: MyRegularsDocument): string {
   return JSON.stringify(parseDocument(document), null, 2);
 }
+
+// Type assertions for parsed schema results
+export type ParsedPerson = z.infer<typeof personSchema>;
+export type ParsedGroup = z.infer<typeof groupSchema>;
+export type ParsedLocation = z.infer<typeof locationSchema>;
+
+// Ensure zod inferred types match our interfaces
+type _PersonCheck = ParsedPerson extends Person ? true : false;
+type _GroupCheck = ParsedGroup extends Group ? true : false;
+type _LocationCheck = ParsedLocation extends Location ? true : false;
+const _: [_PersonCheck, _GroupCheck, _LocationCheck] = [true, true, true];
+void _;

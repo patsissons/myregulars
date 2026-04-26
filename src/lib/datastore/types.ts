@@ -1,13 +1,57 @@
 export type DatastoreUri = `gist:${string}`;
 
-export type LocationRecord = Record<string, unknown>;
+export interface Pet {
+  name: string;
+  species: string;
+}
+
+export interface VisitEntry {
+  date: string;
+  note?: string;
+}
+
+export interface Relationship {
+  personId: string;
+  kind: string;
+}
+
+export interface Person {
+  id: string;
+  name: string;
+  detail: string;
+  photoUrl?: string;
+  lastSeen?: string;
+  visitLog?: VisitEntry[];
+  pets?: Pet[];
+  relationships?: Relationship[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  people: Person[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  description?: string;
+  groups: Group[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface MyRegularsDocument {
   app: "myregulars";
   schemaVersion: 1;
   updatedAt: string;
   data: {
-    locations: LocationRecord[];
+    locations: Location[];
   };
 }
 
