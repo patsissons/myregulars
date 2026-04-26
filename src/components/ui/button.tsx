@@ -12,6 +12,7 @@ interface ButtonProps {
   onClick?: () => void;
   type?: "button" | "submit" | "reset";
   className?: string;
+  style?: React.CSSProperties;
 }
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
@@ -52,6 +53,7 @@ export function Button({
   onClick,
   type = "button",
   className,
+  style,
 }: ButtonProps) {
   return (
     <button
@@ -65,7 +67,7 @@ export function Button({
         fullWidth && "w-full",
         className,
       )}
-      style={variantStyles[variant]}
+      style={{ ...variantStyles[variant], ...style }}
     >
       {children}
     </button>

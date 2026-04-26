@@ -1,19 +1,32 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Home from "./page";
 
-vi.mock("next/image", () => ({
-  default: ({
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    priority: _priority,
-    ...props
-    // eslint-disable-next-line jsx-a11y/alt-text, @next/next/no-img-element
-  }: React.ComponentProps<"img"> & { priority?: boolean }) => <img {...props} />,
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Mock auth context
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ isAuthenticated: false }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 describe("Home", () => {
-  it("renders the heading", () => {
+  it("renders the main headline", () => {
     render(<Home />);
-    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByText(/Remember the people/)[0]).toBeTruthy();
+  });
+
+  it("renders mobile Get started button", () => {
+    render(<Home />);
+    expect(screen.getByText("Get started")).toBeTruthy();
+  });
+
+  it("renders desktop Connect with GitHub button", () => {
+    render(<Home />);
+    expect(screen.getByText("Connect with GitHub")).toBeTruthy();
   });
 });
