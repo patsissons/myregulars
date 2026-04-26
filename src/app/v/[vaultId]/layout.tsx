@@ -15,6 +15,7 @@ import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
+import { useShareDialog } from "@/components/share-dialog";
 import { VaultLoader } from "./vault-loader";
 
 interface VaultShellProps {
@@ -27,6 +28,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { vault, isSyncing, isReadOnly, addLocation, cloneVault } = useVault();
+
+  const { openShare, ShareDialogComponent } = useShareDialog();
 
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
@@ -124,6 +127,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
         <div className="flex items-center gap-1">
           <button
             type="button"
+            onClick={openShare}
             className="flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[12px] font-[500] transition-opacity hover:opacity-70"
             style={{
               background: "var(--mr-subtle)",
@@ -361,6 +365,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           </div>
         </div>
       </Modal>
+
+      {ShareDialogComponent}
     </div>
   );
 }
