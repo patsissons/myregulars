@@ -8,6 +8,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { PersonRow } from "@/components/ui/person-row";
 import { LocationDetailContent } from "@/components/location-detail-content";
+import { usePersonFormDialog } from "@/components/person-form-dialog";
 import { useVault } from "@/lib/vault-context";
 
 export default function LocationPage({
@@ -18,6 +19,7 @@ export default function LocationPage({
   const { vaultId, locationId } = use(params);
   const router = useRouter();
   const { vault, isReadOnly } = useVault();
+  const { openAdd, DialogComponent } = usePersonFormDialog();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -54,7 +56,8 @@ export default function LocationPage({
   const hasSearch = search.length > 0;
 
   function handleAddPerson() {
-    // Placeholder — will be wired to Add Person modal in Task 11
+    if (!location) return;
+    openAdd(locationId, location);
   }
 
   return (
@@ -203,6 +206,8 @@ export default function LocationPage({
           </button>
         )}
       </div>
+
+      {DialogComponent}
     </>
   );
 }

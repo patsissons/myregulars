@@ -30,7 +30,7 @@ interface VaultContextValue extends VaultState {
   addLocation: (name: string, description?: string) => void;
   updateLocation: (locationId: string, updates: Partial<Location>) => void;
   deleteLocation: (locationId: string) => void;
-  addGroup: (locationId: string, name: string) => void;
+  addGroup: (locationId: string, name: string) => string;
   addPerson: (
     locationId: string,
     groupId: string,
@@ -261,18 +261,20 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addGroup = useCallback(
-    (locationId: string, name: string) => {
+    (locationId: string, name: string): string => {
+      const newGroup = createGroup(name);
       mutateLocations((locs) =>
         locs.map((l) =>
           l.id === locationId
             ? {
                 ...l,
-                groups: [...l.groups, createGroup(name)],
+                groups: [...l.groups, newGroup],
                 updatedAt: new Date().toISOString(),
               }
             : l,
         ),
       );
+      return newGroup.id;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [scheduleSync],

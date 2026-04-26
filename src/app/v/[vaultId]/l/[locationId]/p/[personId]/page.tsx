@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { PersonDetailPane } from "@/components/person-detail-pane";
 import { LocationDetailContent } from "@/components/location-detail-content";
+import { usePersonFormDialog } from "@/components/person-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -19,6 +20,7 @@ export default function PersonPage({
   const { vaultId, locationId, personId } = use(params);
   const router = useRouter();
   const { vault, isReadOnly, logVisit } = useVault();
+  const { openAdd, openEdit, DialogComponent } = usePersonFormDialog();
 
   const result = findPerson(vault, locationId, personId);
   const location = vault?.locations.find((l) => l.id === locationId);
@@ -43,7 +45,8 @@ export default function PersonPage({
   }
 
   function handleEdit() {
-    // Placeholder — will be wired to Edit Person modal in Task 11
+    if (!location) return;
+    openEdit(locationId, group.id, person, location);
   }
 
   return (
@@ -52,7 +55,12 @@ export default function PersonPage({
       <div className="hidden h-full lg:flex">
         {/* Center: location detail */}
         <div className="min-w-0 flex-1 overflow-hidden">
-          <LocationDetailContent location={location} vaultId={vaultId} activePersonId={personId} />
+          <LocationDetailContent
+            location={location}
+            vaultId={vaultId}
+            activePersonId={personId}
+            onAddPerson={() => openAdd(locationId, location)}
+          />
         </div>
 
         {/* Right rail */}
@@ -203,6 +211,8 @@ export default function PersonPage({
           </div>
         </div>
       </div>
+
+      {DialogComponent}
     </>
   );
 }
