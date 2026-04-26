@@ -15,6 +15,8 @@ import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/components/ui/toast";
 import { useShareDialog } from "@/components/share-dialog";
 import { LayoutTransition } from "@/components/layout-transition";
 import { VaultSearch } from "@/components/vault-search";
@@ -30,6 +32,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { vault, isSyncing, isReadOnly, addLocation, cloneVault } = useVault();
+  const { isAuthenticated } = useAuth();
+  const { showToast } = useToast();
 
   const { openShare, ShareDialogComponent } = useShareDialog();
 
@@ -76,6 +80,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     try {
       const newUri = await cloneVault(cloneName.trim());
       const gistId = getGistIdFromUri(newUri);
+      showToast("Vault cloned!");
       router.push(`/v/${gistId}`);
     } catch (err) {
       setCloneError(err instanceof Error ? err.message : "Failed to clone vault.");
@@ -162,7 +167,13 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
       {isReadOnly && (
         <ReadOnlyBanner
           onClone={() => {
-            setCloneName(vault?.name ?? "");
+            if (!isAuthenticated) {
+              const returnTo = encodeURIComponent(window.location.href);
+              router.push(`/connect?returnTo=${returnTo}`);
+              return;
+            }
+            const baseName = vault?.name ?? "Vault";
+            setCloneName(`${baseName} — copy`);
             setShowCloneModal(true);
           }}
         />

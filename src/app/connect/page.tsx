@@ -14,18 +14,24 @@ export default function ConnectPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Read ?returnTo= from URL (client-only)
+  const returnTo =
+    typeof window !== "undefined"
+      ? (new URLSearchParams(window.location.search).get("returnTo") ?? "/vaults")
+      : "/vaults";
+
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/vaults");
+      router.push(returnTo);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, returnTo, router]);
 
   async function handleGitHubConnect() {
     setIsLoading(true);
     setError("");
     try {
       await login();
-      router.push("/vaults");
+      router.push(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "GitHub authorization failed.");
       setIsLoading(false);
