@@ -1,4 +1,7 @@
-import { ChevronRight } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { ChevronRight, Upload } from "lucide-react";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import type { KnownVault } from "@/lib/vault-types";
 import { cn } from "@/lib/cn";
@@ -99,6 +102,80 @@ export function NewVaultCard({ onClick, className }: NewVaultCardProps) {
       </div>
       <span className="text-[14px] font-[500]" style={{ color: "var(--mr-dim)" }}>
         New vault
+      </span>
+    </button>
+  );
+}
+
+interface ImportVaultCardProps {
+  onClick: () => void;
+  onFileDrop?: (file: File) => void;
+  className?: string;
+}
+
+export function ImportVaultCard({ onClick, onFileDrop, className }: ImportVaultCardProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dropEnabled = Boolean(onFileDrop);
+
+  function handleDragOver(e: React.DragEvent<HTMLButtonElement>) {
+    if (!dropEnabled) return;
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLButtonElement>) {
+    if (!dropEnabled) return;
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLButtonElement>) {
+    if (!dropEnabled) return;
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) onFileDrop?.(file);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        "flex w-full flex-col items-center justify-center gap-2 rounded-[14px] p-[24px] text-left transition-all duration-[120ms]",
+        "hover:bg-mr-subtle hover:border-black/50! active:scale-[0.99]",
+        className,
+      )}
+      style={{
+        background: isDragOver ? "var(--mr-subtle)" : "transparent",
+        border: `1.5px dashed ${isDragOver ? "var(--mr-accent)" : "var(--mr-edge-strong)"}`,
+        minHeight: 100,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: "var(--mr-subtle)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Upload size={16} style={{ color: isDragOver ? "var(--mr-accent)" : "var(--mr-dim)" }} />
+      </div>
+      <span
+        className="text-[14px] font-[500]"
+        style={{ color: isDragOver ? "var(--mr-accent)" : "var(--mr-dim)" }}
+      >
+        {isDragOver ? "Drop to import" : "Import from JSON"}
       </span>
     </button>
   );

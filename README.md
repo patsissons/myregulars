@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<p align="center">
+  <img src="docs/design/brand/MyRegulars-logo-256.png" alt="MyRegulars logo" width="128" height="128" />
+</p>
 
-## Getting Started
+<h1 align="center">MyRegulars</h1>
 
-First, run the development server:
+<p align="center">
+  A personal notebook for remembering the names and faces of regulars at your favourite local spots.
+</p>
+
+<p align="center">
+  <img src="public/screenshot.jpeg" alt="MyRegulars screenshot" width="800" />
+</p>
+
+---
+
+## What it does
+
+MyRegulars helps you track the people you see regularly at cafes, gyms, co-working spaces, or any venue you frequent. Never forget a name again.
+
+- **Vaults** — Each vault is a self-contained notebook backed by a GitHub Gist. Create as many as you like, share them read-only, or clone someone else's.
+- **Places** — Organize people by location (e.g. "Morning Cafe", "Friday Gym").
+- **Groups** — Within a place, split people into groups (e.g. "Staff", "Regulars", "Dog walkers").
+- **People** — Record names, key details, photos, pets, and visit history for each person.
+- **Visit logging** — One-tap "seen today" tracking with optional notes.
+- **Version history** — Every save is versioned. Browse, view, or revert to any past state of your vault.
+- **Sharing** — Generate a QR code or share link so others can view (read-only) or clone your vault.
+- **Offline-friendly** — Cached locally for fast loads; syncs to GitHub Gists when online.
+- **Dark mode** — Full light/dark theme support.
+- **Responsive** — Mobile-first design with a desktop sidebar layout.
+
+## Tech stack
+
+| Layer      | Technology                           |
+| ---------- | ------------------------------------ |
+| Framework  | Next.js (App Router)                 |
+| Language   | TypeScript (strict)                  |
+| Styling    | Tailwind CSS                         |
+| Data store | GitHub Gists (one gist = one vault)  |
+| Validation | Zod                                  |
+| Auth       | GitHub OAuth (personal access token) |
+| Testing    | Vitest + React Testing Library       |
+| E2E        | Playwright                           |
+
+## Getting started
 
 ```bash
+# Install dependencies
+npm install
+
+# Run the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and sign in with your GitHub account.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command                       | Purpose                                       |
+| ----------------------------- | --------------------------------------------- |
+| `npm run dev`                 | Start development server                      |
+| `npm run build`               | Production build                              |
+| `npm run format-and-validate` | Format, typecheck, lint, and test in one pass |
+| `npm test`                    | Run unit/component tests (Vitest)             |
+| `npm run test:e2e`            | Run end-to-end tests (Playwright)             |
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/              # Next.js App Router pages and API routes
+  components/       # React components (UI primitives + features)
+  lib/              # Core logic — datastore adapters, context, utilities
+    datastore/      # Pluggable storage layer (GitHub Gist adapter)
+docs/               # Design assets and reference material
+e2e/                # Playwright end-to-end tests
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private project.

@@ -150,8 +150,11 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     this.uri = normalizeDatastoreUri(uri);
   }
 
-  async create(): Promise<{ uri: DatastoreUri; data: MyRegularsDocument; version: string }> {
+  async create(
+    initial?: MyRegularsDocument,
+  ): Promise<{ uri: DatastoreUri; data: MyRegularsDocument; version: string }> {
     const authToken = requireAuthToken(this.authToken);
+    const seed = initial ?? createEmptyDocument();
     const response = await this.fetchImpl(GITHUB_GISTS_API_URL, {
       method: "POST",
       headers: buildHeaders(authToken),
@@ -159,7 +162,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
         public: false,
         files: {
           [this.fileName]: {
-            content: serializeDocument(createEmptyDocument()),
+            content: serializeDocument(seed),
           },
         },
       }),

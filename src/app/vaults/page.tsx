@@ -1,27 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { VaultCard, NewVaultCard } from "@/components/vault-card";
+import { VaultCard, NewVaultCard, ImportVaultCard } from "@/components/vault-card";
 import { useAuth } from "@/lib/auth-context";
 import { VaultProvider, useVault } from "@/lib/vault-context";
 import { discoverDatastores } from "@/lib/db";
 import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
 import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
-import type { DatastoreUri } from "@/lib/datastore/types";
+import { parseDocumentString } from "@/lib/datastore/schema";
+import type { DatastoreUri, MyRegularsDocument } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
 import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 function VaultsContent() {
   const router = useRouter();
   const { username } = useAuth();
-  const { createVault } = useVault();
+  const { createVault, importVault } = useVault();
   const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
   // Read from localStorage in lazy initializer (client-only component)
   const [vaults, setVaults] = useState<KnownVault[]>(() =>
@@ -33,6 +34,13 @@ function VaultsContent() {
   const [isCreating, setIsCreating] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [importedDoc, setImportedDoc] = useState<MyRegularsDocument | null>(null);
+  const [importName, setImportName] = useState("");
+  const [importError, setImportError] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +102,78 @@ function VaultsContent() {
       console.error("Failed to create vault:", err);
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  function resetImportState() {
+    setImportJson("");
+    setImportedDoc(null);
+    setImportName("");
+    setImportError("");
+    setIsImporting(false);
+  }
+
+  function tryParseImport(value: string) {
+    setImportJson(value);
+    setImportError("");
+    if (!value.trim()) {
+      setImportedDoc(null);
+      return;
+    }
+    try {
+      const doc = parseDocumentString(value);
+      setImportedDoc(doc);
+      if (!importName.trim()) {
+        setImportName(doc.name?.trim() ?? "");
+      }
+    } catch (err) {
+      setImportedDoc(null);
+      setImportError(err instanceof Error ? err.message : "Invalid vault JSON.");
+    }
+  }
+
+  async function readFileIntoImport(file: File) {
+    try {
+      const text = await file.text();
+      tryParseImport(text);
+    } catch {
+      setImportError("Could not read file.");
+    }
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await readFileIntoImport(file);
+  }
+
+  async function handleImportFileDrop(file: File) {
+    setShowImportModal(true);
+    await readFileIntoImport(file);
+  }
+
+  async function handleImportVault() {
+    if (!importedDoc) return;
+    const trimmedName = importName.trim();
+    if (!trimmedName) {
+      setImportError("Enter a vault name.");
+      return;
+    }
+    const existingNames = vaults.map((v) => v.name);
+    const confirmed = await checkDuplicate("vault", trimmedName, existingNames);
+    if (!confirmed) return;
+    setIsImporting(true);
+    try {
+      const uri = await importVault(trimmedName, importedDoc);
+      const gistId = getGistIdFromUri(uri);
+      setShowImportModal(false);
+      resetImportState();
+      router.push(`/v/${gistId}`);
+    } catch (err) {
+      console.error("Failed to import vault:", err);
+      setImportError(err instanceof Error ? err.message : "Failed to import vault.");
+      setIsImporting(false);
     }
   }
 
@@ -170,6 +250,10 @@ function VaultsContent() {
               </div>
             ))}
           <NewVaultCard onClick={() => setShowNewVaultModal(true)} />
+          <ImportVaultCard
+            onClick={() => setShowImportModal(true)}
+            onFileDrop={handleImportFileDrop}
+          />
         </div>
 
         {/* Open by link (mobile prominent, desktop secondary) */}
@@ -226,6 +310,95 @@ function VaultsContent() {
               disabled={!newVaultName.trim() || isCreating}
             >
               {isCreating ? "Creating…" : "Create vault"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Import Vault Modal */}
+      <Modal
+        open={showImportModal}
+        onOpenChange={(open) => {
+          setShowImportModal(open);
+          if (!open) resetImportState();
+        }}
+        title="Import vault"
+        width={520}
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-2">
+            <Eyebrow>Vault JSON</Eyebrow>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => importFileInputRef.current?.click()}
+              >
+                Choose file…
+              </Button>
+              <span className="text-[12px]" style={{ color: "var(--mr-faint)" }}>
+                or paste below
+              </span>
+            </div>
+            <Textarea
+              placeholder='{ "app": "myregulars", "schemaVersion": 1, ... }'
+              value={importJson}
+              onChange={(e) => tryParseImport(e.target.value)}
+              rows={8}
+              spellCheck={false}
+              className="font-mono"
+            />
+            {importError && (
+              <p className="text-[12px]" style={{ color: "var(--mr-danger)" }}>
+                {importError}
+              </p>
+            )}
+            {importedDoc && !importError && (
+              <p className="text-[12px]" style={{ color: "var(--mr-dim)" }}>
+                {importedDoc.data.locations.length} location
+                {importedDoc.data.locations.length === 1 ? "" : "s"} ·{" "}
+                {importedDoc.data.locations.reduce(
+                  (sum, l) => sum + l.groups.reduce((s, g) => s + g.people.length, 0),
+                  0,
+                )}{" "}
+                people
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Eyebrow>Vault name</Eyebrow>
+            <Input
+              placeholder="My regulars"
+              value={importName}
+              onChange={(e) => setImportName(e.target.value)}
+              disabled={!importedDoc}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowImportModal(false);
+                resetImportState();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleImportVault}
+              disabled={!importedDoc || !importName.trim() || isImporting}
+            >
+              {isImporting ? "Importing…" : "Import vault"}
             </Button>
           </div>
         </div>

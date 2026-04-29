@@ -36,11 +36,14 @@ export async function beginGitHubAuthFlow(): Promise<string> {
 
 export const beginGitHubAuth = beginGitHubAuthFlow;
 
-export async function createDatastore(vaultName?: string): Promise<DatastoreSnapshot> {
+export async function createDatastore(
+  vaultName?: string,
+  initialDocument?: MyRegularsDocument,
+): Promise<DatastoreSnapshot> {
   const authToken = getGitHubAuthToken();
   const fileName = vaultName ? buildVaultFileName(vaultName) : undefined;
   const adapter = createAdapter(authToken, fileName);
-  const created = await adapter.create();
+  const created = await adapter.create(initialDocument);
 
   return cacheSnapshot({
     document: created.data,

@@ -15,7 +15,7 @@ import {
 import { getGistIdFromUri } from "@/lib/datastore/uri";
 import { getAuthenticatedUser } from "@/lib/github-user";
 import { addKnownVault, getKnownVaults, updateKnownVault } from "@/lib/known-vaults";
-import type { Group, Location, Person } from "@/lib/datastore/types";
+import type { Group, Location, MyRegularsDocument, Person } from "@/lib/datastore/types";
 import type { DatastoreUri } from "@/lib/datastore/types";
 import type { Vault } from "@/lib/vault-types";
 
@@ -36,6 +36,7 @@ interface VaultState {
 interface VaultContextValue extends VaultState {
   loadVault: (uri: string) => Promise<void>;
   createVault: (name: string) => Promise<DatastoreUri>;
+  importVault: (name: string, document: MyRegularsDocument) => Promise<DatastoreUri>;
   addLocation: (name: string, description?: string) => void;
   updateLocation: (locationId: string, updates: Partial<Location>) => void;
   deleteLocation: (locationId: string) => void;
@@ -260,6 +261,39 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     updateState({ vault, uri, version: snapshot.version, isReadOnly: false, isLoading: false });
     return uri;
   }, []);
+
+  const importVault = useCallback(
+    async (name: string, document: MyRegularsDocument): Promise<DatastoreUri> => {
+      const seed: MyRegularsDocument = {
+        ...document,
+        name,
+        updatedAt: new Date().toISOString(),
+      };
+      const snapshot = await createDatastore(name, seed);
+      const uri = snapshot.uri;
+
+      const vault: Vault = {
+        name,
+        locations: snapshot.document.data.locations,
+      };
+      vaultRef.current = vault;
+      uriRef.current = uri;
+      versionRef.current = snapshot.version;
+
+      const peopleCount = vault.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length;
+      addKnownVault({
+        uri,
+        name,
+        lastOpened: new Date().toISOString(),
+        peopleCount,
+        locationCount: vault.locations.length,
+      });
+
+      updateState({ vault, uri, version: snapshot.version, isReadOnly: false, isLoading: false });
+      return uri;
+    },
+    [],
+  );
 
   const addLocation = useCallback(
     (name: string, description?: string) => {
@@ -646,6 +680,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     ...state,
     loadVault,
     createVault,
+    importVault,
     addLocation,
     updateLocation,
     deleteLocation,

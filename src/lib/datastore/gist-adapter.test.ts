@@ -56,6 +56,47 @@ describe("GistStorageAdapter", () => {
     );
   });
 
+  it("creates a gist seeded with a provided initial document", async () => {
+    const seed = createEmptyDocument(new Date("2026-04-23T12:00:00.000Z"));
+    seed.name = "Imported Vault";
+    seed.data.locations = [
+      {
+        id: "loc1",
+        name: "Café",
+        groups: [],
+        createdAt: "2026-04-23T12:00:00.000Z",
+        updatedAt: "2026-04-23T12:00:00.000Z",
+      },
+    ];
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "abc123",
+        files: {
+          "myregulars.json": {
+            content: JSON.stringify(seed),
+          },
+        },
+        history: [{ version: "sha-create", committed_at: "2026-04-23T12:00:00.000Z" }],
+      }),
+    );
+
+    const adapter = new GistStorageAdapter({
+      authToken: "token",
+      fetchImpl: fetchMock,
+    });
+
+    const result = await adapter.create(seed);
+
+    expect(result.uri).toBe("gist:abc123");
+    expect(result.data).toEqual(seed);
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string) as {
+      files: Record<string, { content: string }>;
+    };
+    expect(JSON.parse(body.files["myregulars.json"].content)).toEqual(seed);
+  });
+
   it("reads the latest datastore document", async () => {
     const document = createEmptyDocument(new Date("2026-04-23T12:00:00.000Z"));
 

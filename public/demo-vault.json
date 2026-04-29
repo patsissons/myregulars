@@ -1,0 +1,219 @@
+{
+  "app": "myregulars",
+  "schemaVersion": 1,
+  "name": "Sample Neighbourhood",
+  "updatedAt": "2026-04-27T19:42:11.000Z",
+  "data": {
+    "locations": [
+      {
+        "id": "loc_blackbird_cafe",
+        "name": "Blackbird Café",
+        "description": "Corner café on Main & 4th. Espresso bar up front, tables in the back.",
+        "createdAt": "2025-08-14T09:00:00.000Z",
+        "updatedAt": "2026-04-27T19:42:11.000Z",
+        "groups": [
+          {
+            "id": "grp_morning_crew",
+            "name": "Morning Crew",
+            "description": "The regulars who are in before 9am, every weekday.",
+            "createdAt": "2025-08-14T09:05:00.000Z",
+            "updatedAt": "2026-04-26T08:12:00.000Z",
+            "people": [
+              {
+                "id": "per_marguerite",
+                "name": "Marguerite",
+                "detail": "Cortado, one sugar. Always reads the print paper. Lawyer, semi-retired.",
+                "lastSeen": "2026-04-27T07:58:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-27T07:58:00.000Z" },
+                  {
+                    "date": "2026-04-26T08:02:00.000Z",
+                    "note": "Brought a friend visiting from Halifax."
+                  },
+                  { "date": "2026-04-24T07:51:00.000Z" }
+                ],
+                "pets": [{ "name": "Olive", "species": "Whippet" }],
+                "createdAt": "2025-08-14T09:10:00.000Z",
+                "updatedAt": "2026-04-27T07:58:00.000Z"
+              },
+              {
+                "id": "per_dev",
+                "name": "Dev",
+                "detail": "Oat flat white. Runs a design studio two blocks over. Tattoo on left forearm.",
+                "lastSeen": "2026-04-27T08:34:00.000Z",
+                "visitLog": [
+                  {
+                    "date": "2026-04-27T08:34:00.000Z",
+                    "note": "Mentioned a baby on the way — late summer."
+                  },
+                  { "date": "2026-04-25T08:20:00.000Z" }
+                ],
+                "relationships": [{ "personId": "per_priya", "kind": "partner" }],
+                "createdAt": "2025-09-02T08:30:00.000Z",
+                "updatedAt": "2026-04-27T08:34:00.000Z"
+              },
+              {
+                "id": "per_priya",
+                "name": "Priya",
+                "detail": "Matcha, no sweetener. Architect. Usually on a video call at the back table.",
+                "lastSeen": "2026-04-25T08:21:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-25T08:21:00.000Z" },
+                  { "date": "2026-04-22T08:15:00.000Z", "note": "Asked about the new pastry case." }
+                ],
+                "relationships": [{ "personId": "per_dev", "kind": "partner" }],
+                "createdAt": "2025-09-02T08:31:00.000Z",
+                "updatedAt": "2026-04-25T08:21:00.000Z"
+              }
+            ]
+          },
+          {
+            "id": "grp_weekend_brunch",
+            "name": "Weekend Brunch",
+            "description": "The Saturday & Sunday regulars who linger over a second pour.",
+            "createdAt": "2025-09-20T10:30:00.000Z",
+            "updatedAt": "2026-04-26T11:18:00.000Z",
+            "people": [
+              {
+                "id": "per_theo",
+                "name": "Theo",
+                "detail": "Drip coffee, room for cream. Works in food at the radio station. Loves to chat.",
+                "lastSeen": "2026-04-26T11:18:00.000Z",
+                "visitLog": [
+                  {
+                    "date": "2026-04-26T11:18:00.000Z",
+                    "note": "Recommended the new Ethiopian single-origin."
+                  },
+                  { "date": "2026-04-19T10:55:00.000Z" }
+                ],
+                "createdAt": "2025-09-20T10:35:00.000Z",
+                "updatedAt": "2026-04-26T11:18:00.000Z"
+              },
+              {
+                "id": "per_amelie_jacques",
+                "name": "Amélie & Jacques",
+                "detail": "Couple, mid-60s. Always order the seasonal galette to share. French speakers.",
+                "lastSeen": "2026-04-26T10:42:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-26T10:42:00.000Z" },
+                  {
+                    "date": "2026-04-19T10:30:00.000Z",
+                    "note": "Anniversary — comped them dessert."
+                  },
+                  { "date": "2026-04-12T10:38:00.000Z" }
+                ],
+                "createdAt": "2025-10-04T10:45:00.000Z",
+                "updatedAt": "2026-04-26T10:42:00.000Z"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "loc_the_anchor",
+        "name": "The Anchor",
+        "description": "Neighbourhood pub near the harbour. Trivia Tuesdays, vinyl night Thursdays.",
+        "createdAt": "2025-11-02T18:00:00.000Z",
+        "updatedAt": "2026-04-25T22:14:00.000Z",
+        "groups": [
+          {
+            "id": "grp_trivia_table",
+            "name": "Trivia Table",
+            "description": "The team that has the back booth on Tuesday nights.",
+            "createdAt": "2025-11-02T19:00:00.000Z",
+            "updatedAt": "2026-04-21T22:30:00.000Z",
+            "people": [
+              {
+                "id": "per_maeve",
+                "name": "Maeve",
+                "detail": "Pint of stout. Marine biologist. Captains the team — frighteningly good at geography.",
+                "lastSeen": "2026-04-21T22:30:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-21T22:30:00.000Z", "note": "Team won by 3 points." },
+                  { "date": "2026-04-14T22:25:00.000Z" },
+                  { "date": "2026-04-07T22:18:00.000Z" }
+                ],
+                "pets": [
+                  { "name": "Captain", "species": "Cat" },
+                  { "name": "Biscuit", "species": "Cat" }
+                ],
+                "createdAt": "2025-11-02T19:05:00.000Z",
+                "updatedAt": "2026-04-21T22:30:00.000Z"
+              },
+              {
+                "id": "per_omar",
+                "name": "Omar",
+                "detail": "Negroni, then a cider. Music journalist. Strong on pop culture rounds.",
+                "lastSeen": "2026-04-21T22:32:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-21T22:32:00.000Z" },
+                  {
+                    "date": "2026-04-14T22:28:00.000Z",
+                    "note": "Introduced his sister, visiting from Edinburgh."
+                  }
+                ],
+                "createdAt": "2025-11-09T19:15:00.000Z",
+                "updatedAt": "2026-04-21T22:32:00.000Z"
+              },
+              {
+                "id": "per_sana",
+                "name": "Sana",
+                "detail": "Sparkling water with lime. PhD student in history. Carries the team on dates & wars.",
+                "lastSeen": "2026-04-14T22:24:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-14T22:24:00.000Z" },
+                  {
+                    "date": "2026-03-31T22:30:00.000Z",
+                    "note": "Defended her thesis last week — celebratory mocktail on the house."
+                  }
+                ],
+                "createdAt": "2025-11-16T19:20:00.000Z",
+                "updatedAt": "2026-04-14T22:24:00.000Z"
+              }
+            ]
+          },
+          {
+            "id": "grp_friday_drop_ins",
+            "name": "Friday Drop-ins",
+            "description": "The after-work crowd who turn up most Fridays around 6.",
+            "createdAt": "2025-12-05T18:30:00.000Z",
+            "updatedAt": "2026-04-25T19:45:00.000Z",
+            "people": [
+              {
+                "id": "per_lukas",
+                "name": "Lukas",
+                "detail": "IPA, whatever's local on tap. Carpenter. Hat collection rotates weekly.",
+                "lastSeen": "2026-04-24T19:45:00.000Z",
+                "visitLog": [
+                  {
+                    "date": "2026-04-24T19:45:00.000Z",
+                    "note": "Finishing a kitchen reno on Powell — wrapping next week."
+                  },
+                  { "date": "2026-04-10T19:30:00.000Z" }
+                ],
+                "createdAt": "2025-12-05T18:35:00.000Z",
+                "updatedAt": "2026-04-24T19:45:00.000Z"
+              },
+              {
+                "id": "per_ines",
+                "name": "Inés",
+                "detail": "House red. Veterinarian. Often comes straight from the clinic — still in scrubs.",
+                "lastSeen": "2026-04-25T19:12:00.000Z",
+                "visitLog": [
+                  { "date": "2026-04-25T19:12:00.000Z" },
+                  {
+                    "date": "2026-04-17T19:20:00.000Z",
+                    "note": "Asked the kitchen for a dog-friendly snack for Pepper."
+                  }
+                ],
+                "pets": [{ "name": "Pepper", "species": "Border Collie" }],
+                "createdAt": "2026-01-09T19:00:00.000Z",
+                "updatedAt": "2026-04-25T19:12:00.000Z"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

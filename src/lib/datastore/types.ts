@@ -85,7 +85,7 @@ export interface DiscoveredVault {
 
 export interface StorageAdapter<TDocument> {
   connect(uri: string): Promise<void>;
-  create(): Promise<{ uri: DatastoreUri; data: TDocument; version: string }>;
+  create(initial?: TDocument): Promise<{ uri: DatastoreUri; data: TDocument; version: string }>;
   read(): Promise<{ data: TDocument; version: string }>;
   readVersion(version: string): Promise<{ data: TDocument; version: string }>;
   write(data: TDocument): Promise<string>;
