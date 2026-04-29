@@ -141,27 +141,29 @@ function VaultsContent() {
               Looking for existing vaults…
             </p>
           )}
-          {vaults.map((vault) => (
-            <div key={vault.uri} className="relative flex flex-col">
-              <VaultCard
-                vault={vault}
-                onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
-              />
-              <button
-                type="button"
-                onClick={() => handleDeleteVault(vault.uri)}
-                className="absolute top-[14px] right-[14px] z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-black/[0.1] dark:hover:bg-white/[0.12]"
-                style={{
-                  background: "var(--mr-subtle)",
-                  border: "1px solid var(--mr-edge)",
-                  color: "var(--mr-dim)",
-                }}
-                aria-label="Remove vault from list"
-              >
-                <X size={11} />
-              </button>
-            </div>
-          ))}
+          {[...vaults]
+            .sort((a, b) => (b.lastOpened ?? "").localeCompare(a.lastOpened ?? ""))
+            .map((vault) => (
+              <div key={vault.uri} className="relative flex flex-col">
+                <VaultCard
+                  vault={vault}
+                  onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleDeleteVault(vault.uri)}
+                  className="absolute top-[14px] right-[14px] z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-black/[0.1] dark:hover:bg-white/[0.12]"
+                  style={{
+                    background: "var(--mr-subtle)",
+                    border: "1px solid var(--mr-edge)",
+                    color: "var(--mr-dim)",
+                  }}
+                  aria-label="Remove vault from list"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
           <NewVaultCard onClick={() => setShowNewVaultModal(true)} />
         </div>
 

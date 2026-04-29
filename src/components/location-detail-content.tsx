@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { PersonCard } from "@/components/ui/person-card";
 import { EmptyState } from "@/components/empty-state";
 import { AnimatedList, AnimatedItem } from "@/components/animated-list";
@@ -28,11 +29,12 @@ export function LocationDetailContent({
   onAddPerson,
 }: LocationDetailContentProps) {
   const router = useRouter();
-  const { isReadOnly, deleteGroup } = useVault();
+  const { isReadOnly, deleteLocation, deleteGroup } = useVault();
   const { showToast } = useToast();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   function handleDeleteGroup(groupId: string, groupName: string, peopleCount: number) {
     if (peopleCount > 0) {
@@ -45,19 +47,27 @@ export function LocationDetailContent({
     if (activeGroupId === groupId) setActiveGroupId(null);
   }
 
+  function handleDeletePlace() {
+    deleteLocation(location.id);
+    router.push(`/v/${vaultId}`);
+  }
+
   const totalPeople = location.groups.flatMap((g) => g.people).length;
 
   const hasSearch = search.length > 0;
 
-  const visibleGroups = location.groups
+  const visibleGroups = [...location.groups]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
     .filter((g) => activeGroupId === null || g.id === activeGroupId)
     .map((g) => ({
       ...g,
-      people: g.people.filter((p) => {
-        if (!search) return true;
-        const q = search.toLowerCase();
-        return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
-      }),
+      people: [...g.people]
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+        .filter((p) => {
+          if (!search) return true;
+          const q = search.toLowerCase();
+          return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
+        }),
     }))
     // When searching, hide groups with no matches; otherwise show all groups
     .filter((g) => !hasSearch || g.people.length > 0);
@@ -74,17 +84,29 @@ export function LocationDetailContent({
         <div className="mb-3 flex items-start gap-4">
           <div className="min-w-0 flex-1">
             <Eyebrow className="mb-1 block">Place</Eyebrow>
-            <h1
-              style={{
-                fontSize: 26,
-                fontWeight: 600,
-                letterSpacing: "-0.025em",
-                color: "var(--mr-text)",
-                lineHeight: 1.1,
-              }}
-            >
-              {location.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1
+                style={{
+                  fontSize: 26,
+                  fontWeight: 600,
+                  letterSpacing: "-0.025em",
+                  color: "var(--mr-text)",
+                  lineHeight: 1.1,
+                }}
+              >
+                {location.name}
+              </h1>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                  aria-label="Delete place"
+                >
+                  <Trash2 size={15} style={{ color: "var(--mr-danger)" }} />
+                </button>
+              )}
+            </div>
             <p className="mt-1 text-[13px]" style={{ color: "var(--mr-dim)" }}>
               {location.description ? `${location.description} · ` : ""}
               {totalPeople} {totalPeople === 1 ? "person" : "people"}
@@ -119,24 +141,26 @@ export function LocationDetailContent({
           <Chip active={activeGroupId === null} onClick={() => setActiveGroupId(null)}>
             All
           </Chip>
-          {location.groups.map((g) => (
-            <div key={g.id} className="flex items-center gap-0.5">
-              <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
-                {g.name}
-              </Chip>
-              {!isReadOnly && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
-                  className="hover:bg-mr-subtle flex h-5 w-5 items-center justify-center rounded-full transition-colors"
-                  style={{ color: "var(--mr-faint)" }}
-                  aria-label={`Delete group ${g.name}`}
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
-          ))}
+          {[...location.groups]
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+            .map((g) => (
+              <div key={g.id} className="flex items-center gap-0.5">
+                <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
+                  {g.name}
+                </Chip>
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
+                    className="hover:bg-mr-subtle flex h-5 w-5 items-center justify-center rounded-full transition-colors"
+                    style={{ color: "var(--mr-faint)" }}
+                    aria-label={`Delete group ${g.name}`}
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            ))}
         </div>
       </div>
 
@@ -203,6 +227,25 @@ export function LocationDetailContent({
           </div>
         )}
       </div>
+
+      {/* Delete Place Confirmation Modal */}
+      <Modal open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm} title="Delete place">
+        <div className="flex flex-col gap-4 p-5">
+          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
+            This will permanently delete{" "}
+            <strong style={{ color: "var(--mr-text)" }}>{location.name}</strong> and all its people.
+            This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeletePlace}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -57,7 +57,9 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   // Sync label derived in render (no setState needed)
   const syncLabel = isSyncing ? "syncing…" : "saved";
 
-  const filteredLocations = vault?.locations ?? [];
+  const filteredLocations = [...(vault?.locations ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
 
   // Recent people: top 5 by lastSeen across all locations
   const recentPeople = getAllPeople(vault)

@@ -51,15 +51,18 @@ export default function LocationPage({
   // Mobile filter state
   const hasSearch = search.length > 0;
 
-  const visibleGroups = location.groups
+  const visibleGroups = [...location.groups]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
     .filter((g) => activeGroupId === null || g.id === activeGroupId)
     .map((g) => ({
       ...g,
-      people: g.people.filter((p) => {
-        if (!search) return true;
-        const q = search.toLowerCase();
-        return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
-      }),
+      people: [...g.people]
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+        .filter((p) => {
+          if (!search) return true;
+          const q = search.toLowerCase();
+          return p.name.toLowerCase().includes(q) || p.detail.toLowerCase().includes(q);
+        }),
     }))
     // When searching, hide groups with no matches; otherwise show all groups
     .filter((g) => !hasSearch || g.people.length > 0);
@@ -195,24 +198,26 @@ export default function LocationPage({
             <Chip active={activeGroupId === null} onClick={() => setActiveGroupId(null)}>
               All
             </Chip>
-            {location.groups.map((g) => (
-              <div key={g.id} className="flex items-center gap-0.5">
-                <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
-                  {g.name}
-                </Chip>
-                {!isReadOnly && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
-                    className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-                    style={{ color: "var(--mr-faint)" }}
-                    aria-label={`Delete group ${g.name}`}
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
-            ))}
+            {[...location.groups]
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+              .map((g) => (
+                <div key={g.id} className="flex items-center gap-0.5">
+                  <Chip active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)}>
+                    {g.name}
+                  </Chip>
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGroup(g.id, g.name, g.people.length)}
+                      className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                      style={{ color: "var(--mr-faint)" }}
+                      aria-label={`Delete group ${g.name}`}
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
 

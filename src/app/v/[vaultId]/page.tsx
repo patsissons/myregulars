@@ -114,34 +114,36 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
             className="flex flex-col overflow-hidden rounded-[14px]"
             style={{ background: "var(--mr-panel)", border: "1px solid var(--mr-edge)" }}
           >
-            {vault.locations.map((location, idx) => {
-              const pc = location.groups.flatMap((g) => g.people).length;
-              return (
-                <button
-                  key={location.id}
-                  type="button"
-                  onClick={() => router.push(`/v/${vaultId}/l/${location.id}`)}
-                  className="flex w-full items-center gap-3 px-4 py-[14px] text-left transition-colors hover:bg-black/[0.04] active:opacity-70 dark:hover:bg-white/[0.05]"
-                  style={{
-                    borderTop: idx > 0 ? "1px solid var(--mr-edge)" : undefined,
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="text-[15px] font-[500]"
-                      style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
-                    >
-                      {location.name}
-                    </p>
-                    <p className="mt-0.5 text-[13px]" style={{ color: "var(--mr-dim)" }}>
-                      {location.description ? `${location.description} · ` : ""}
-                      {pc} {pc === 1 ? "person" : "people"}
-                    </p>
-                  </div>
-                  <ChevronRight size={16} style={{ color: "var(--mr-faint)", flexShrink: 0 }} />
-                </button>
-              );
-            })}
+            {[...vault.locations]
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+              .map((location, idx) => {
+                const pc = location.groups.flatMap((g) => g.people).length;
+                return (
+                  <button
+                    key={location.id}
+                    type="button"
+                    onClick={() => router.push(`/v/${vaultId}/l/${location.id}`)}
+                    className="flex w-full items-center gap-3 px-4 py-[14px] text-left transition-colors hover:bg-black/[0.04] active:opacity-70 dark:hover:bg-white/[0.05]"
+                    style={{
+                      borderTop: idx > 0 ? "1px solid var(--mr-edge)" : undefined,
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="text-[15px] font-[500]"
+                        style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
+                      >
+                        {location.name}
+                      </p>
+                      <p className="mt-0.5 text-[13px]" style={{ color: "var(--mr-dim)" }}>
+                        {location.description ? `${location.description} · ` : ""}
+                        {pc} {pc === 1 ? "person" : "people"}
+                      </p>
+                    </div>
+                    <ChevronRight size={16} style={{ color: "var(--mr-faint)", flexShrink: 0 }} />
+                  </button>
+                );
+              })}
           </div>
         ) : (
           <p className="mb-4 text-[14px]" style={{ color: "var(--mr-dim)" }}>
