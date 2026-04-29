@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { useShareDialog } from "@/components/share-dialog";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
+import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 import { LayoutTransition } from "@/components/layout-transition";
 import { VaultSearch } from "@/components/vault-search";
 import { VaultLoader } from "./vault-loader";
@@ -33,12 +34,23 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { vault, isSyncing, isReadOnly, addLocation, cloneVault, updateVaultName } = useVault();
+  const {
+    vault,
+    isSyncing,
+    isReadOnly,
+    isHistoricalVersion,
+    historicalVersionId,
+    addLocation,
+    cloneVault,
+    updateVaultName,
+    revertToVersion,
+  } = useVault();
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
   const { openShare, ShareDialogComponent } = useShareDialog();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
+  const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(vaultId);
 
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
   const [newPlaceName, setNewPlaceName] = useState("");
@@ -47,6 +59,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const [cloneName, setCloneName] = useState("");
   const [isCloning, setIsCloning] = useState(false);
   const [cloneError, setCloneError] = useState("");
+  const [showRevertModal, setShowRevertModal] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -87,6 +101,18 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     setRenameValue("");
   }
 
+  async function handleRevert() {
+    setIsReverting(true);
+    try {
+      await revertToVersion();
+      showToast("Reverted successfully");
+      globalThis.location.assign(`/v/${vaultId}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to revert.");
+      setIsReverting(false);
+    }
+  }
+
   async function handleClone() {
     if (!cloneName.trim()) return;
     setIsCloning(true);
@@ -104,7 +130,13 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "var(--mr-bg)" }}>
+    <div
+      className="flex min-h-screen flex-col"
+      style={{
+        background: "var(--mr-bg)",
+        ...(isHistoricalVersion ? { boxShadow: "inset 0 0 0 3px var(--mr-accent)" } : undefined),
+      }}
+    >
       {/* Top bar — desktop only */}
       <div
         className="hidden shrink-0 items-center gap-2 lg:flex"
@@ -177,6 +209,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
                 },
               },
               { label: "View vault data", onClick: openVaultData },
+              { label: "Version history", onClick: openVersionHistory },
               { label: "Close vault", onClick: () => router.push("/vaults") },
             ]}
             trigger={
@@ -192,8 +225,39 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
         </div>
       </div>
 
+      {/* Historical version banner */}
+      {isHistoricalVersion && historicalVersionId && (
+        <div
+          className="flex items-center justify-between px-4 py-2"
+          style={{
+            background: "var(--mr-accent-soft)",
+            borderBottom: "1px solid var(--mr-accent-soft-border)",
+          }}
+        >
+          <span className="text-[13px] font-[500]" style={{ color: "var(--mr-accent)" }}>
+            Viewing version {historicalVersionId.slice(0, 7)}
+          </span>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/v/${vaultId}`}
+              className="inline-flex h-[30px] items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-[500] no-underline transition-all hover:brightness-[0.92] dark:hover:brightness-[1.1]"
+              style={{
+                background: "var(--mr-subtle)",
+                border: "1px solid var(--mr-edge)",
+                color: "var(--mr-text)",
+              }}
+            >
+              Back to latest
+            </a>
+            <Button variant="primary" size="sm" onClick={() => setShowRevertModal(true)}>
+              Revert to this version
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Read-only banner */}
-      {isReadOnly && (
+      {isReadOnly && !isHistoricalVersion && (
         <ReadOnlyBanner
           onClone={() => {
             if (!isAuthenticated) {
@@ -404,8 +468,34 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
         </div>
       </Modal>
 
+      {/* Revert Confirmation Modal */}
+      <Modal
+        open={showRevertModal}
+        onOpenChange={setShowRevertModal}
+        title="Revert to this version"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
+            This will create a new version with the data from version{" "}
+            <strong className="font-mono" style={{ color: "var(--mr-text)" }}>
+              {historicalVersionId?.slice(0, 7)}
+            </strong>
+            . Your current latest version will still be available in history.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowRevertModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleRevert} disabled={isReverting}>
+              {isReverting ? "Reverting…" : "Revert"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {ShareDialogComponent}
       {VaultDataDialogComponent}
+      {VersionHistoryDialogComponent}
     </div>
   );
 }

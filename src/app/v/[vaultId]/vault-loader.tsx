@@ -10,11 +10,18 @@ interface VaultLoaderProps {
 }
 
 export function VaultLoader({ vaultId, children }: VaultLoaderProps) {
-  const { vault, isLoading, error, loadVault } = useVault();
+  const { vault, isLoading, error, loadVault, loadVaultVersion } = useVault();
 
   useEffect(() => {
-    loadVault(vaultId);
-  }, [vaultId, loadVault]);
+    const params = new URLSearchParams(window.location.search);
+    const version = params.get("version");
+
+    if (version) {
+      loadVaultVersion(vaultId, version);
+    } else {
+      loadVault(vaultId);
+    }
+  }, [vaultId, loadVault, loadVaultVersion]);
 
   if (!vault && error) {
     return (

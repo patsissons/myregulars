@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useVault } from "@/lib/vault-context";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
+import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 
 export default function VaultPage({ params }: { params: Promise<{ vaultId: string }> }) {
   const { vaultId } = use(params);
   const router = useRouter();
   const { vault, isReadOnly, addLocation, updateVaultName } = useVault();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
+  const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(vaultId);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -61,6 +63,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
               },
             },
             { label: "View vault data", onClick: openVaultData },
+            { label: "Version history", onClick: openVersionHistory },
             { label: "Close vault", onClick: () => router.push("/vaults") },
           ]}
           trigger={
@@ -215,6 +218,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
       </Modal>
 
       {VaultDataDialogComponent}
+      {VersionHistoryDialogComponent}
     </div>
   );
 }

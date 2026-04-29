@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { createDatastore, loadDatastore, saveDatastore } from "@/lib/db";
+import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
@@ -28,6 +28,9 @@ interface VaultState {
   isSyncing: boolean;
   error: string | null;
   ownerHandle: string | null;
+  isHistoricalVersion: boolean;
+  historicalVersionId: string | null;
+  latestVersion: string | null;
 }
 
 interface VaultContextValue extends VaultState {
@@ -59,6 +62,8 @@ interface VaultContextValue extends VaultState {
   ) => void;
   logVisit: (locationId: string, groupId: string, personId: string, note?: string) => void;
   cloneVault: (name: string) => Promise<DatastoreUri>;
+  loadVaultVersion: (uri: string, version: string) => Promise<void>;
+  revertToVersion: () => Promise<void>;
 }
 
 const VaultContext = createContext<VaultContextValue | null>(null);
@@ -75,6 +80,9 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     isSyncing: false,
     error: null,
     ownerHandle: null,
+    isHistoricalVersion: false,
+    historicalVersionId: null,
+    latestVersion: null,
   });
 
   const vaultRef = useRef<Vault | null>(null);
@@ -555,6 +563,84 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     return newUri;
   }, []);
 
+  const loadVaultVersion = useCallback(async (uriInput: string, version: string) => {
+    updateState({ isLoading: true, error: null });
+    try {
+      // First load the latest to get current version for potential revert
+      const latestSnapshot = await loadDatastore(uriInput);
+      const uri = latestSnapshot.uri;
+
+      // Now load the historical version
+      const snapshot = await loadDatastoreVersion(uri, version);
+
+      const existingVault = getKnownVaults().find((v) => v.uri === uri);
+      const vault: Vault = {
+        name:
+          snapshot.document.name ??
+          existingVault?.name ??
+          `Vault ${getGistIdFromUri(uri).slice(0, 6)}`,
+        locations: snapshot.document.data.locations,
+      };
+
+      vaultRef.current = vault;
+      uriRef.current = uri;
+      versionRef.current = latestSnapshot.version;
+
+      updateState({
+        vault,
+        uri,
+        version: latestSnapshot.version,
+        isReadOnly: true,
+        isLoading: false,
+        error: null,
+        ownerHandle: null,
+        isHistoricalVersion: true,
+        historicalVersionId: version,
+        latestVersion: latestSnapshot.version,
+      });
+    } catch (error) {
+      updateState({
+        isLoading: false,
+        error: error instanceof Error ? error.message : "Failed to load version.",
+      });
+    }
+  }, []);
+
+  const revertToVersion = useCallback(async () => {
+    const currentVault = vaultRef.current;
+    const uri = uriRef.current;
+    const latestVersion = versionRef.current;
+    const token = getGitHubAuthToken();
+
+    if (!currentVault || !uri || !latestVersion || !token) {
+      throw new Error("Cannot revert: missing vault data or authentication.");
+    }
+
+    const document = {
+      ...createEmptyDocument(),
+      name: currentVault.name,
+      data: { locations: currentVault.locations },
+    };
+
+    const saved = await saveDatastore({
+      uri,
+      expectedVersion: latestVersion,
+      document,
+      authToken: token,
+    });
+
+    versionRef.current = saved.version;
+
+    updateState({
+      version: saved.version,
+      isReadOnly: false,
+      isHistoricalVersion: false,
+      historicalVersionId: null,
+      latestVersion: null,
+      isSyncing: false,
+    });
+  }, []);
+
   // Helper to find a person (used by components)
   const contextValue: VaultContextValue = {
     ...state,
@@ -572,6 +658,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     movePerson,
     logVisit,
     cloneVault,
+    loadVaultVersion,
+    revertToVersion,
   };
 
   return <VaultContext.Provider value={contextValue}>{children}</VaultContext.Provider>;
