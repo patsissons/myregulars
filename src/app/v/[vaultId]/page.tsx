@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { useVault } from "@/lib/vault-context";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
+import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 export default function VaultPage({ params }: { params: Promise<{ vaultId: string }> }) {
   const { vaultId } = use(params);
@@ -18,6 +19,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
   const { vault, isReadOnly, addLocation, updateVaultName } = useVault();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(vaultId);
+  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -158,9 +160,12 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
         {!isReadOnly && (
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               const name = window.prompt("Place name:");
-              if (name?.trim()) addLocation(name.trim());
+              if (!name?.trim()) return;
+              const existingNames = vault?.locations.map((l) => l.name) ?? [];
+              const confirmed = await checkDuplicate("place", name.trim(), existingNames);
+              if (confirmed) addLocation(name.trim());
             }}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-[14px] text-[14px] font-[500] transition-all hover:brightness-[0.92] active:opacity-70 dark:hover:brightness-[1.1]"
             style={{
@@ -219,6 +224,7 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
 
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
+      {DuplicateConfirmDialogComponent}
     </div>
   );
 }

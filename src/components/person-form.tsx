@@ -8,6 +8,7 @@ import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 import { useVault } from "@/lib/vault-context";
 import type { Location, Pet, Person } from "@/lib/datastore/types";
 
@@ -28,6 +29,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
   const { mode, location, locationId, person } = config;
   const { vault, addGroup, addPerson, updatePerson, deletePerson, movePerson } = useVault();
   const { showToast } = useToast();
+  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
 
   const liveLocation = vault?.locations.find((l) => l.id === locationId) ?? location;
   const initialGroupId = config.groupId ?? liveLocation.groups[0]?.id ?? null;
@@ -56,15 +58,18 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
     setShowAddPet(false);
   }
 
-  function handleCreateGroup() {
+  async function handleCreateGroup() {
     if (!newGroupName.trim()) return;
+    const existingNames = liveLocation.groups.map((g) => g.name);
+    const confirmed = await checkDuplicate("group", newGroupName.trim(), existingNames);
+    if (!confirmed) return;
     const groupId = addGroup(locationId, newGroupName.trim());
     setSelectedGroupId(groupId);
     setNewGroupName("");
     setShowNewGroupInput(false);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) return;
 
     // Determine group ID (may need to create the group first)
@@ -78,6 +83,13 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
     // If still no group, create a default "Regulars" group
     if (!groupId) {
       groupId = addGroup(locationId, "Regulars");
+    }
+
+    // Check for duplicate person name (add mode only)
+    if (mode === "add") {
+      const existingNames = liveLocation.groups.flatMap((g) => g.people.map((p) => p.name));
+      const confirmed = await checkDuplicate("person", name.trim(), existingNames);
+      if (!confirmed) return;
     }
 
     const personData = {
@@ -338,6 +350,8 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
           </Button>
         </div>
       </div>
+
+      {DuplicateConfirmDialogComponent}
     </div>
   );
 }

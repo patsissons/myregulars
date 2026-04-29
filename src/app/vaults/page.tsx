@@ -16,11 +16,13 @@ import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vau
 import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
 import type { DatastoreUri } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
+import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 function VaultsContent() {
   const router = useRouter();
   const { username } = useAuth();
   const { createVault } = useVault();
+  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
   // Read from localStorage in lazy initializer (client-only component)
   const [vaults, setVaults] = useState<KnownVault[]>(() =>
     typeof localStorage !== "undefined" ? getKnownVaults() : [],
@@ -79,6 +81,9 @@ function VaultsContent() {
 
   async function handleCreateVault() {
     if (!newVaultName.trim()) return;
+    const existingNames = vaults.map((v) => v.name);
+    const confirmed = await checkDuplicate("vault", newVaultName.trim(), existingNames);
+    if (!confirmed) return;
     setIsCreating(true);
     try {
       const uri = await createVault(newVaultName.trim());
@@ -225,6 +230,8 @@ function VaultsContent() {
           </div>
         </div>
       </Modal>
+
+      {DuplicateConfirmDialogComponent}
     </div>
   );
 }

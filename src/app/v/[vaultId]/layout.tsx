@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { useShareDialog } from "@/components/share-dialog";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
+import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 import { LayoutTransition } from "@/components/layout-transition";
 import { VaultSearch } from "@/components/vault-search";
 import { VaultLoader } from "./vault-loader";
@@ -51,6 +52,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const { openShare, ShareDialogComponent } = useShareDialog();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(vaultId);
+  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
 
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
   const [newPlaceName, setNewPlaceName] = useState("");
@@ -86,8 +88,11 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     return loc?.groups.flatMap((g) => g.people).length ?? 0;
   }
 
-  function handleAddPlace() {
+  async function handleAddPlace() {
     if (!newPlaceName.trim()) return;
+    const existingNames = vault?.locations.map((l) => l.name) ?? [];
+    const confirmed = await checkDuplicate("place", newPlaceName.trim(), existingNames);
+    if (!confirmed) return;
     addLocation(newPlaceName.trim(), newPlaceDesc.trim() || undefined);
     setShowNewPlaceModal(false);
     setNewPlaceName("");
@@ -496,6 +501,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
       {ShareDialogComponent}
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
+      {DuplicateConfirmDialogComponent}
     </div>
   );
 }
