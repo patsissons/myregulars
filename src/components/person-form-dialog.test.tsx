@@ -78,8 +78,9 @@ describe("usePersonFormDialog", () => {
     await user.click(screen.getByRole("button", { name: "open add" }));
 
     const dialog = screen.getByRole("dialog");
-    // Sheet content is pinned to the bottom edge and has no Close button.
-    expect(dialog.className).toContain("bottom-0");
+    // Sheet content is pinned to the bottom edge (inline bottom, lifted above the
+    // keyboard at runtime) and has no Close button.
+    expect(dialog.style.bottom).toBe("0px");
     expect(dialog.className).not.toContain("top-1/2");
     expect(screen.queryByLabelText("Close")).toBeNull();
   });
