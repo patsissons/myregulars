@@ -21,8 +21,8 @@ gitignored.
 The `vaults.updated` autodate field is the optimistic-concurrency version token. All collections are
 owner-scoped via API rules (`owner = @request.auth.id`); snapshots are immutable to users.
 
-> Migrations target the PocketBase JSVM API (v0.23+, `app`/`fields`). If you run an older release,
-> regenerate them from the Admin UI.
+> Migrations target the PocketBase JSVM API (v0.23+, `app`/`fields`) and are verified against
+> v0.39.4. If you run an older release, regenerate them from the Admin UI.
 
 ## Local setup
 
