@@ -120,7 +120,7 @@ export function PersonRow({ person, onClick, onLog, isReadOnly, className }: Per
             onClick={onClick}
             className={cn(
               "flex w-full items-center gap-3 px-0 py-[10px] text-left transition-colors duration-100",
-              "border-b last:border-b-0 active:opacity-70",
+              "border-b last:border-b-0 hover:bg-black/[0.03] active:opacity-70 dark:hover:bg-white/[0.04]",
               className,
             )}
             style={{ borderColor: "var(--mr-edge)" }}

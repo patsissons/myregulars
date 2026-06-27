@@ -195,7 +195,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
               <button
                 type="button"
                 onClick={handleCreateGroup}
-                className="text-[12px] font-[500]"
+                className="text-[12px] font-[500] transition-opacity hover:opacity-50"
                 style={{ color: "var(--mr-accent)" }}
               >
                 Add
@@ -300,7 +300,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                 <button
                   type="button"
                   onClick={handleAddPet}
-                  className="text-[12px] font-[500]"
+                  className="text-[12px] font-[500] transition-opacity hover:opacity-50"
                   style={{ color: "var(--mr-accent)" }}
                 >
                   Add

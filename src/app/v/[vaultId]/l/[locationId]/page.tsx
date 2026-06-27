@@ -279,7 +279,7 @@ export default function LocationPage({
           <button
             type="button"
             onClick={handleAddPerson}
-            className="fixed flex items-center gap-2 text-[14px] font-[500] transition-opacity active:opacity-70"
+            className="fixed flex items-center gap-2 text-[14px] font-[500] transition-all hover:brightness-110 active:opacity-70 dark:hover:brightness-90"
             style={{
               right: 22,
               bottom: 32,
