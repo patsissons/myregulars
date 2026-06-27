@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
-import { getGitHubAuthToken } from "@/lib/datastore/auth";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
 import {
@@ -12,8 +11,8 @@ import {
   extractVaultNameFromFileName,
   generateId,
 } from "@/lib/datastore/helpers";
-import { getGistIdFromUri } from "@/lib/datastore/uri";
-import { getAuthenticatedUser } from "@/lib/github-user";
+import { getIdFromUri, getProviderFromUri } from "@/lib/datastore/uri";
+import { getVaultAuthToken, resolveVaultOwnership } from "@/lib/datastore/ownership";
 import { addKnownVault, getKnownVaults, updateKnownVault } from "@/lib/known-vaults";
 import type { Group, Location, MyRegularsDocument, Person } from "@/lib/datastore/types";
 import type { DatastoreUri } from "@/lib/datastore/types";
@@ -107,7 +106,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const vault = vaultRef.current;
       const uri = uriRef.current;
       const version = versionRef.current;
-      const token = getGitHubAuthToken();
+      const token = uri ? getVaultAuthToken(uri) : null;
 
       if (!vault || !uri || !version || !token) return;
 
@@ -174,31 +173,9 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     try {
       const snapshot = await loadDatastore(uriInput);
       const uri = snapshot.uri;
-      const gistId = getGistIdFromUri(uri);
 
-      // Determine read-only status by checking if auth user owns the gist
-      // For now, check the gist owner from the GitHub API
-      const user = await getAuthenticatedUser();
-      let ownerHandle: string | null = null;
-      let isReadOnly = true;
-
-      if (user) {
-        // Fetch gist info to get owner
-        const token = getGitHubAuthToken();
-        const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
-          headers: token
-            ? {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.github.v3+json",
-              }
-            : { Accept: "application/vnd.github.v3+json" },
-        });
-        if (resp.ok) {
-          const gistData = (await resp.json()) as { owner: { login: string } };
-          ownerHandle = gistData.owner.login;
-          isReadOnly = ownerHandle !== user.login;
-        }
-      }
+      // Read-only status and owner are resolved per provider.
+      const { ownerHandle, isReadOnly } = await resolveVaultOwnership(uri);
 
       const existingVault = getKnownVaults().find((v) => v.uri === uri);
       const nameFromFile = snapshot.vaultFileName
@@ -207,7 +184,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const nameFromDocument = snapshot.document.name;
       const vault: Vault = {
         name:
-          nameFromDocument ?? existingVault?.name ?? nameFromFile ?? `Vault ${gistId.slice(0, 6)}`,
+          nameFromDocument ??
+          existingVault?.name ??
+          nameFromFile ??
+          `Vault ${getIdFromUri(uri).slice(0, 6)}`,
         locations: snapshot.document.data.locations,
       };
 
@@ -546,18 +526,22 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   const cloneVault = useCallback(async (name: string): Promise<DatastoreUri> => {
     const currentVault = vaultRef.current;
-    if (!currentVault) throw new Error("No vault loaded to clone.");
+    const sourceUri = uriRef.current;
+    if (!currentVault || !sourceUri) throw new Error("No vault loaded to clone.");
 
-    const token = getGitHubAuthToken();
-    if (!token) throw new Error("Authentication required to clone vault.");
+    const provider = getProviderFromUri(sourceUri);
+    if (!getVaultAuthToken(sourceUri)) {
+      throw new Error("Authentication required to clone vault.");
+    }
 
-    // Create a new empty gist
-    const snapshot = await createDatastore();
+    // Create a new vault in the same provider as the source.
+    const snapshot = await createDatastore(name, undefined, provider);
     const newUri = snapshot.uri;
 
-    // Save current vault data into new gist
+    // Save the current vault's data into the new vault.
     const document = {
       ...createEmptyDocument(),
+      name,
       data: { locations: currentVault.locations },
     };
 
@@ -565,7 +549,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       uri: newUri,
       expectedVersion: snapshot.version,
       document,
-      authToken: token,
+      authToken: getVaultAuthToken(newUri) ?? undefined,
     });
 
     const peopleCount = currentVault.locations.flatMap((l) =>
@@ -610,9 +594,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const existingVault = getKnownVaults().find((v) => v.uri === uri);
       const vault: Vault = {
         name:
-          snapshot.document.name ??
-          existingVault?.name ??
-          `Vault ${getGistIdFromUri(uri).slice(0, 6)}`,
+          snapshot.document.name ?? existingVault?.name ?? `Vault ${getIdFromUri(uri).slice(0, 6)}`,
         locations: snapshot.document.data.locations,
       };
 
@@ -644,7 +626,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     const currentVault = vaultRef.current;
     const uri = uriRef.current;
     const latestVersion = versionRef.current;
-    const token = getGitHubAuthToken();
+    const token = uri ? getVaultAuthToken(uri) : null;
 
     if (!currentVault || !uri || !latestVersion || !token) {
       throw new Error("Cannot revert: missing vault data or authentication.");
