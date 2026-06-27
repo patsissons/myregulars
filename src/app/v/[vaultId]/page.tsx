@@ -102,11 +102,11 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
 
       {/* ─── Mobile vault home ─── */}
       <div
-        className="flex min-h-screen flex-col lg:hidden"
+        className="flex min-h-dvh flex-col lg:hidden"
         style={{
           background: "var(--mr-bg)",
           color: "var(--mr-text)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
         }}
       >
         {/* Mobile header */}
