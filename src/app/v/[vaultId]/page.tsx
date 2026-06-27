@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getAllPeople, useVault } from "@/lib/vault-context";
+import { VaultSearch } from "@/components/vault-search";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
@@ -164,16 +165,8 @@ export default function VaultPage({ params }: { params: Promise<{ vaultId: strin
             {peopleCount} people
           </p>
 
-          {/* Search pill (display only — full search in task 14) */}
-          <div
-            className="mt-4 flex items-center gap-2 rounded-full px-4 py-2.5"
-            style={{ background: "var(--mr-subtle)", border: "1px solid var(--mr-edge)" }}
-          >
-            <Search size={14} style={{ color: "var(--mr-faint)" }} />
-            <span className="text-[14px]" style={{ color: "var(--mr-faint)" }}>
-              Search vault
-            </span>
-          </div>
+          {/* Vault-wide people search */}
+          <VaultSearch vaultId={vaultId} showShortcut={false} className="mt-4" />
         </div>
 
         {/* PLACES section */}

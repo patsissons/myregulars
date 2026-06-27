@@ -29,9 +29,11 @@ interface VaultSearchProps {
   vaultId: string;
   /** Additional CSS class for the outer container */
   className?: string;
+  /** Show the ⌘K keyboard-shortcut hint (desktop). Defaults to true. */
+  showShortcut?: boolean;
 }
 
-export function VaultSearch({ vaultId, className }: VaultSearchProps) {
+export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSearchProps) {
   const { vault } = useVault();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -117,22 +119,26 @@ export function VaultSearch({ vaultId, className }: VaultSearchProps) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          className="w-full rounded-[8px] py-[6px] pr-10 pl-[30px] text-[13px] outline-none"
+          className={`w-full rounded-[8px] py-[6px] pl-[30px] text-[13px] outline-none ${
+            showShortcut ? "pr-10" : "pr-3"
+          }`}
           style={{
             background: "var(--mr-subtle)",
             color: "var(--mr-text)",
           }}
         />
-        <div
-          className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded px-[5px] py-[2px] text-[10px]"
-          style={{
-            background: "var(--mr-edge)",
-            color: "var(--mr-faint)",
-            lineHeight: 1.3,
-          }}
-        >
-          ⌘K
-        </div>
+        {showShortcut && (
+          <div
+            className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded px-[5px] py-[2px] text-[10px]"
+            style={{
+              background: "var(--mr-edge)",
+              color: "var(--mr-faint)",
+              lineHeight: 1.3,
+            }}
+          >
+            ⌘K
+          </div>
+        )}
       </div>
 
       {/* Results dropdown */}
