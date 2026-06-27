@@ -26,7 +26,7 @@ export function VaultLoader({ vaultId, children }: VaultLoaderProps) {
   if (!vault && error) {
     return (
       <div
-        className="flex min-h-screen flex-col items-center justify-center gap-4"
+        className="flex min-h-dvh flex-col items-center justify-center gap-4"
         style={{ background: "var(--mr-bg)" }}
       >
         <p className="text-[14px]" style={{ color: "var(--mr-danger)" }}>
@@ -42,7 +42,7 @@ export function VaultLoader({ vaultId, children }: VaultLoaderProps) {
   if (!vault || isLoading) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex min-h-dvh items-center justify-center"
         style={{ background: "var(--mr-bg)" }}
       >
         <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>

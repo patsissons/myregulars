@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/cn";
+import { useKeyboardInset } from "@/lib/use-keyboard-inset";
 
 interface SheetProps {
   open: boolean;
@@ -14,6 +15,12 @@ interface SheetProps {
 
 export function Sheet({ open, onOpenChange, title, children, className }: SheetProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // On iOS the keyboard overlays the sheet (position: fixed stays anchored
+  // behind it). Lift the sheet above the keyboard and cap it to the visible
+  // area so its body scrolls in view.
+  const { inset, viewportHeight } = useKeyboardInset(open);
+  const keyboardOpen = inset > 0;
 
   // Start the scroll container at the top when the sheet opens, so a focused
   // field near the top stays visible instead of the content jumping to the end.
@@ -38,13 +45,14 @@ export function Sheet({ open, onOpenChange, title, children, className }: SheetP
           }}
         />
         <Dialog.Content
-          className={cn("fixed right-0 bottom-0 left-0 z-[101] outline-none", className)}
+          className={cn("fixed right-0 left-0 z-[101] outline-none", className)}
           style={{
             background: "var(--mr-panel)",
             borderRadius: "20px 20px 0 0",
-            // dvh tracks the on-screen keyboard (via interactiveWidget), keeping
-            // the sheet above it so its content stays scrollable.
-            maxHeight: "88dvh",
+            // Sit on top of the keyboard (inset) rather than behind it, and cap
+            // the height to the area above the keyboard when it's open.
+            bottom: inset,
+            maxHeight: keyboardOpen && viewportHeight ? `${viewportHeight}px` : "88dvh",
             display: "flex",
             flexDirection: "column",
             animation: "mrSheetIn 280ms cubic-bezier(.2,.9,.3,1.1) both",
@@ -88,7 +96,9 @@ export function Sheet({ open, onOpenChange, title, children, className }: SheetP
             style={{
               overflowY: "auto",
               flex: 1,
-              paddingBottom: "env(safe-area-inset-bottom)",
+              // Keep scrolling inside the sheet instead of chaining to the page.
+              overscrollBehavior: "contain",
+              paddingBottom: keyboardOpen ? 0 : "env(safe-area-inset-bottom)",
             }}
           >
             {children}
