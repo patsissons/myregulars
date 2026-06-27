@@ -152,19 +152,13 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           background: "var(--mr-panel)",
         }}
       >
-        {/* Decorative traffic lights */}
-        <div className="mr-1 flex items-center gap-[6px]">
-          {(["#ff5f57", "#febc2e", "#28c840"] as const).map((color) => (
-            <div
-              key={color}
-              style={{ width: 11, height: 11, borderRadius: "50%", background: color }}
-            />
-          ))}
-        </div>
-
-        <LogoMark size={26} />
-
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+        <button
+          type="button"
+          onClick={() => router.push(`/v/${vaultId}`)}
+          className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+          aria-label="Vault overview"
+        >
+          <LogoMark size={26} />
           <span
             className="truncate text-[13px] font-[500]"
             style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
@@ -174,7 +168,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
             · {syncLabel}
           </span>
-        </div>
+        </button>
 
         {/* Right actions */}
         <div className="flex items-center gap-1">
