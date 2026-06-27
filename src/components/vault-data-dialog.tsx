@@ -46,7 +46,10 @@ function highlightJson(json: string): React.ReactNode[] {
           {match[1]}
         </span>,
       );
-      nodes.push(": ");
+      // Emit only the colon — the whitespace JSON.stringify placed after it is
+      // preserved as inter-token text on the next iteration, so re-adding a
+      // space here would render a double space before the value.
+      nodes.push(":");
     } else if (match[2] !== undefined) {
       // String value
       nodes.push(

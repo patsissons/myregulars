@@ -110,10 +110,10 @@ export default function LocationPage({
 
       {/* ─── Mobile layout ─── */}
       <div
-        className="flex min-h-screen flex-col lg:hidden"
+        className="flex min-h-dvh flex-col lg:hidden"
         style={{
           background: "var(--mr-bg)",
-          paddingBottom: "calc(96px + env(safe-area-inset-bottom))",
+          paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
         }}
       >
         {/* Mobile header */}
@@ -279,10 +279,10 @@ export default function LocationPage({
           <button
             type="button"
             onClick={handleAddPerson}
-            className="fixed flex items-center gap-2 text-[14px] font-[500] transition-opacity active:opacity-70"
+            className="fixed flex items-center gap-2 text-[14px] font-[500] transition-all hover:brightness-110 active:opacity-70 dark:hover:brightness-90"
             style={{
               right: 22,
-              bottom: 32,
+              bottom: "calc(24px + env(safe-area-inset-bottom))",
               height: 54,
               borderRadius: 28,
               padding: "0 20px",

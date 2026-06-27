@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Upload } from "lucide-react";
+import { ChevronRight, Loader2, Upload } from "lucide-react";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import type { KnownVault } from "@/lib/vault-types";
 import { cn } from "@/lib/cn";
@@ -9,17 +9,21 @@ import { cn } from "@/lib/cn";
 interface VaultCardProps {
   vault: KnownVault;
   onClick: () => void;
+  loading?: boolean;
   className?: string;
 }
 
-export function VaultCard({ vault, onClick, className }: VaultCardProps) {
+export function VaultCard({ vault, onClick, loading = false, className }: VaultCardProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={loading}
+      aria-busy={loading}
       className={cn(
         "flex h-full w-full flex-col gap-2 rounded-[14px] p-[16px] text-left transition-all duration-[120ms]",
         "border-mr-edge hover:bg-mr-subtle border hover:border-black/50! active:scale-[0.99]",
+        loading && "opacity-60",
         className,
       )}
       style={{
@@ -33,7 +37,15 @@ export function VaultCard({ vault, onClick, className }: VaultCardProps) {
         >
           {vault.name}
         </span>
-        <ChevronRight size={16} style={{ color: "var(--mr-faint)", flexShrink: 0 }} />
+        {loading ? (
+          <Loader2
+            size={16}
+            className="animate-spin"
+            style={{ color: "var(--mr-faint)", flexShrink: 0 }}
+          />
+        ) : (
+          <ChevronRight size={16} style={{ color: "var(--mr-faint)", flexShrink: 0 }} />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1">

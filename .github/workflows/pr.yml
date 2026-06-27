@@ -6,9 +6,6 @@ on:
 jobs:
   harness:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: harness
     steps:
       - uses: actions/checkout@v4
 
@@ -16,8 +13,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: harness/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - run: npm ci
+      # Use `npm install` rather than `npm ci`: the lockfile's wasm-fallback
+      # optional deps (@napi-rs/wasm-runtime / @emnapi/*, pulled in transitively)
+      # resolve to different versions across OS/arch, so a macOS-generated lock
+      # fails `npm ci`'s strict sync check on the Linux runner. `npm install`
+      # re-resolves per platform.
+      - run: npm install --no-audit --no-fund
       - run: npm run validate
+      # Install the browser + its OS dependencies for headless Chromium on CI.
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

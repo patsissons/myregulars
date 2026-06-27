@@ -81,7 +81,7 @@ export default function PersonPage({
 
       {/* ─── Mobile: full-screen person detail ─── */}
       <div
-        className="flex min-h-screen flex-col lg:hidden"
+        className="flex min-h-dvh flex-col lg:hidden"
         style={{ background: "var(--mr-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {/* Mobile header */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
@@ -40,7 +40,16 @@ function VaultsContent() {
   const [importName, setImportName] = useState("");
   const [importError, setImportError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [navigatingUri, setNavigatingUri] = useState<DatastoreUri | null>(null);
+  const [, startNavigation] = useTransition();
   const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleOpenVault(uri: DatastoreUri) {
+    setNavigatingUri(uri);
+    startNavigation(() => {
+      router.push(`/v/${getGistIdFromUri(uri)}`);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +241,8 @@ function VaultsContent() {
               <div key={vault.uri} className="relative flex flex-col">
                 <VaultCard
                   vault={vault}
-                  onClick={() => router.push(`/v/${getGistIdFromUri(vault.uri)}`)}
+                  onClick={() => handleOpenVault(vault.uri)}
+                  loading={navigatingUri === vault.uri}
                 />
                 <button
                   type="button"

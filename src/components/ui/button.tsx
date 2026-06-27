@@ -44,6 +44,17 @@ const sizeStyles: Record<ButtonSize, string> = {
   lg: "h-10 px-5 text-[14px]",
 };
 
+// Hover per variant. The transparent variants set `background` via inline style,
+// which a plain `hover:bg-*` utility cannot override — so they use the important
+// (`!`) modifier to win over the inline value. The filled primary keeps a
+// brightness shift instead, so its accent background is preserved.
+const variantHover: Record<ButtonVariant, string> = {
+  primary: "hover:brightness-95 dark:hover:brightness-110",
+  secondary: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
+  danger: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
+  dashed: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
+};
+
 export function Button({
   children,
   variant = "secondary",
@@ -62,7 +73,8 @@ export function Button({
       disabled={disabled}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-[120ms] select-none",
-        "hover:border-black/50! hover:brightness-95 active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:hover:brightness-110",
+        "active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        variantHover[variant],
         sizeStyles[size],
         fullWidth && "w-full",
         className,
