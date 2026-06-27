@@ -6,9 +6,6 @@ on:
 jobs:
   harness:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: harness
     steps:
       - uses: actions/checkout@v4
 
@@ -16,8 +13,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: harness/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
       - run: npm run validate
+      # Install the browser + its OS dependencies for headless Chromium on CI.
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
