@@ -48,6 +48,20 @@ export function getIdFromUri(uri: DatastoreUri): string {
   return getProviderFromUri(uri) === "hosted" ? getHostedIdFromUri(uri) : getGistIdFromUri(uri);
 }
 
+/**
+ * The `[vaultId]` route segment for a vault. Gist vaults keep their bare id for
+ * backwards-compatible URLs; hosted vaults carry the full `hosted:<id>` so the
+ * provider survives a round-trip through normalizeDatastoreUri.
+ */
+export function getVaultRouteSegment(uri: DatastoreUri): string {
+  return getProviderFromUri(uri) === "hosted" ? uri : getGistIdFromUri(uri);
+}
+
+/** The full `/v/...` path for a vault, with the segment URL-encoded. */
+export function getVaultRoutePath(uri: DatastoreUri): string {
+  return `/v/${encodeURIComponent(getVaultRouteSegment(uri))}`;
+}
+
 export function normalizeDatastoreUri(input: string): DatastoreUri {
   const trimmed = input.trim();
 

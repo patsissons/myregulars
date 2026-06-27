@@ -30,13 +30,25 @@ export function VaultCard({ vault, onClick, loading = false, className }: VaultC
         background: "var(--mr-panel)",
       }}
     >
-      <div className="flex items-center justify-between">
-        <span
-          className="truncate text-[15px] font-[600]"
-          style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
-        >
-          {vault.name}
-        </span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="truncate text-[15px] font-[600]"
+            style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
+          >
+            {vault.name}
+          </span>
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-[500] tracking-wide uppercase"
+            style={{
+              background: "var(--mr-subtle)",
+              color: "var(--mr-faint)",
+              border: "1px solid var(--mr-edge)",
+            }}
+          >
+            {vault.provider === "hosted" ? "Hosted" : "Gist"}
+          </span>
+        </div>
         {loading ? (
           <Loader2
             size={16}

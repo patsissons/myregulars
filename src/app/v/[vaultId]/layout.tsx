@@ -14,7 +14,7 @@ import { ReadOnlyBanner } from "@/components/ui/read-only-banner";
 import { LogoMark } from "@/components/logo-mark";
 import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
-import { getGistIdFromUri } from "@/lib/datastore/uri";
+import { getVaultRoutePath } from "@/lib/datastore/uri";
 import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
@@ -124,9 +124,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     setCloneError("");
     try {
       const newUri = await cloneVault(cloneName.trim());
-      const gistId = getGistIdFromUri(newUri);
       showToast("Vault cloned!");
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(newUri));
     } catch (err) {
       setCloneError(err instanceof Error ? err.message : "Failed to clone vault.");
     } finally {

@@ -7,8 +7,7 @@ import { GitHubMark } from "@/components/icons/github-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { normalizeDatastoreUri } from "@/lib/datastore/uri";
-import { getGistIdFromUri } from "@/lib/datastore/uri";
+import { getVaultRoutePath, normalizeDatastoreUri } from "@/lib/datastore/uri";
 
 const BULLETS = [
   {
@@ -39,8 +38,7 @@ export default function OnboardingPage() {
     if (vaultParam) {
       try {
         const uri = normalizeDatastoreUri(vaultParam);
-        const gistId = getGistIdFromUri(uri);
-        router.push(`/v/${gistId}`);
+        router.push(getVaultRoutePath(uri));
       } catch {
         // Invalid URI, just show onboarding
       }
@@ -61,8 +59,7 @@ export default function OnboardingPage() {
     }
     try {
       const uri = normalizeDatastoreUri(linkInput.trim());
-      const gistId = getGistIdFromUri(uri);
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(uri));
     } catch {
       setLinkError("Invalid vault link. Try a gist ID or share URL.");
     }

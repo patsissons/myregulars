@@ -1,4 +1,5 @@
 import type { DatastoreUri } from "@/lib/datastore/types";
+import { getProviderFromUri } from "@/lib/datastore/uri";
 import type { KnownVault } from "@/lib/vault-types";
 
 const KNOWN_VAULTS_KEY = "myregulars:known-vaults";
@@ -7,7 +8,12 @@ function readAll(): KnownVault[] {
   try {
     const raw = localStorage.getItem(KNOWN_VAULTS_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as KnownVault[];
+    const parsed = JSON.parse(raw) as KnownVault[];
+    // Backfill provider for legacy entries persisted before it was tracked.
+    return parsed.map((vault) => ({
+      ...vault,
+      provider: vault.provider ?? getProviderFromUri(vault.uri),
+    }));
   } catch {
     return [];
   }

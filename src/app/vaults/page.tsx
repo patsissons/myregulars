@@ -13,17 +13,33 @@ import { useAuth } from "@/lib/auth-context";
 import { VaultProvider, useVault } from "@/lib/vault-context";
 import { discoverDatastores } from "@/lib/db";
 import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
-import { normalizeDatastoreUri, getGistIdFromUri } from "@/lib/datastore/uri";
+import {
+  getIdFromUri,
+  getProviderFromUri,
+  getVaultRoutePath,
+  normalizeDatastoreUri,
+} from "@/lib/datastore/uri";
 import { parseDocumentString } from "@/lib/datastore/schema";
-import type { DatastoreUri, MyRegularsDocument } from "@/lib/datastore/types";
+import type { DatastoreProviderId, DatastoreUri, MyRegularsDocument } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
 import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 function VaultsContent() {
   const router = useRouter();
-  const { username } = useAuth();
+  const { username, isAuthenticated, hosted } = useAuth();
   const { createVault, importVault } = useVault();
   const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
+
+  const githubAvailable = isAuthenticated;
+  const hostedAvailable = hosted.isAuthenticated;
+  const bothAvailable = githubAvailable && hostedAvailable;
+  const [createProvider, setCreateProvider] = useState<DatastoreProviderId>("gist");
+  // When only one provider is connected, force it; otherwise honour the choice.
+  const effectiveProvider: DatastoreProviderId = bothAvailable
+    ? createProvider
+    : githubAvailable
+      ? "gist"
+      : "hosted";
   // Read from localStorage in lazy initializer (client-only component)
   const [vaults, setVaults] = useState<KnownVault[]>(() =>
     typeof localStorage !== "undefined" ? getKnownVaults() : [],
@@ -47,7 +63,7 @@ function VaultsContent() {
   function handleOpenVault(uri: DatastoreUri) {
     setNavigatingUri(uri);
     startNavigation(() => {
-      router.push(`/v/${getGistIdFromUri(uri)}`);
+      router.push(getVaultRoutePath(uri));
     });
   }
 
@@ -65,7 +81,8 @@ function VaultsContent() {
             if (!knownUris.has(vault.uri)) {
               const newVault: KnownVault = {
                 uri: vault.uri,
-                name: vault.name ?? `Vault ${getGistIdFromUri(vault.uri).slice(0, 6)}`,
+                provider: getProviderFromUri(vault.uri),
+                name: vault.name ?? `Vault ${getIdFromUri(vault.uri).slice(0, 6)}`,
                 lastOpened: vault.updatedAt,
                 peopleCount: 0,
                 locationCount: 0,
@@ -103,10 +120,9 @@ function VaultsContent() {
     if (!confirmed) return;
     setIsCreating(true);
     try {
-      const uri = await createVault(newVaultName.trim());
-      const gistId = getGistIdFromUri(uri);
+      const uri = await createVault(newVaultName.trim(), effectiveProvider);
       setShowNewVaultModal(false);
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(uri));
     } catch (err) {
       console.error("Failed to create vault:", err);
     } finally {
@@ -174,11 +190,10 @@ function VaultsContent() {
     if (!confirmed) return;
     setIsImporting(true);
     try {
-      const uri = await importVault(trimmedName, importedDoc);
-      const gistId = getGistIdFromUri(uri);
+      const uri = await importVault(trimmedName, importedDoc, effectiveProvider);
       setShowImportModal(false);
       resetImportState();
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(uri));
     } catch (err) {
       console.error("Failed to import vault:", err);
       setImportError(err instanceof Error ? err.message : "Failed to import vault.");
@@ -193,8 +208,7 @@ function VaultsContent() {
     }
     try {
       const uri = normalizeDatastoreUri(linkInput.trim());
-      const gistId = getGistIdFromUri(uri);
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(uri));
     } catch {
       setLinkError("Invalid vault link. Try a gist ID or share URL.");
     }
@@ -210,7 +224,11 @@ function VaultsContent() {
         <div className="mb-2 flex items-center gap-3">
           <LogoMark size={32} />
         </div>
-        {username && <Eyebrow className="mb-1 block">Signed in · github.com/{username}</Eyebrow>}
+        {username ? (
+          <Eyebrow className="mb-1 block">Signed in · github.com/{username}</Eyebrow>
+        ) : hosted.username ? (
+          <Eyebrow className="mb-1 block">Signed in · {hosted.username}</Eyebrow>
+        ) : null}
         <h1
           className="mb-6"
           style={{
@@ -303,6 +321,36 @@ function VaultsContent() {
         title="New vault"
       >
         <div className="flex flex-col gap-4 p-5">
+          {bothAvailable && (
+            <div className="flex flex-col gap-2">
+              <Eyebrow>Store in</Eyebrow>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { id: "gist", label: "GitHub Gist" },
+                    { id: "hosted", label: "Hosted vault" },
+                  ] as const
+                ).map((option) => {
+                  const active = createProvider === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setCreateProvider(option.id)}
+                      className="flex-1 rounded-[10px] border px-3 py-2 text-[13px] font-[500] transition-colors"
+                      style={{
+                        background: active ? "var(--mr-subtle)" : "var(--mr-panel)",
+                        borderColor: active ? "var(--mr-accent)" : "var(--mr-edge)",
+                        color: active ? "var(--mr-text)" : "var(--mr-dim)",
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <Input
             placeholder="My regulars"
             value={newVaultName}
@@ -421,15 +469,16 @@ function VaultsContent() {
 
 export default function VaultsPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, hosted } = useAuth();
+  const authed = isAuthenticated || hosted.isAuthenticated;
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !authed) {
       router.push("/");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [authed, isLoading, router]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !authed) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"
