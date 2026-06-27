@@ -12,6 +12,26 @@ import { clearGitHubAuthToken, setGitHubAuthToken } from "@/lib/datastore/auth";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
 
+const { fakeClient, vaultsGetOne } = vi.hoisted(() => {
+  const vaultsGetOne = vi.fn();
+  const fakeClient = {
+    authStore: { token: "t", record: { id: "u" }, isValid: true },
+    filter: (raw: string) => raw,
+    collection: () => ({
+      getOne: vaultsGetOne,
+      create: vi.fn(),
+      update: vi.fn(),
+      getFullList: vi.fn(),
+    }),
+  };
+  return { fakeClient, vaultsGetOne };
+});
+
+vi.mock("@/lib/datastore/pocketbase-config", () => ({
+  isHostedConfigured: () => true,
+  getPocketBaseClient: () => fakeClient,
+}));
+
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -37,6 +57,18 @@ describe("db facade", () => {
       gistId: "abc123",
       shareUrl: "http://localhost:3000/?gist=abc123",
     });
+  });
+
+  it("routes hosted uris to the PocketBase adapter", async () => {
+    const document = createEmptyDocument();
+    vaultsGetOne.mockResolvedValueOnce({ document, updated: "v1" });
+
+    const snapshot = await loadDatastore("hosted:rec1");
+
+    expect(vaultsGetOne).toHaveBeenCalledWith("rec1");
+    expect(snapshot.uri).toBe("hosted:rec1");
+    expect(snapshot.version).toBe("v1");
+    expect(snapshot.source).toBe("remote");
   });
 
   it("creates a datastore with a single fetch call", async () => {

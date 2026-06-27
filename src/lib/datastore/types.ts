@@ -98,4 +98,6 @@ export interface StorageAdapter<TDocument> {
   listVersions(): Promise<VersionInfo[]>;
   discover(): Promise<DiscoveredVault[]>;
   getUri(): DatastoreUri;
+  /** Optional: the detected vault file name (gist provider only). */
+  getVaultFileName?(): string | null;
 }
