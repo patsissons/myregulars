@@ -32,6 +32,8 @@ describe("db facade", () => {
   it("connects a datastore reference", async () => {
     await expect(connectDatastore("https://myregulars.app/?gist=abc123")).resolves.toEqual({
       uri: "gist:abc123",
+      provider: "gist",
+      id: "abc123",
       gistId: "abc123",
       shareUrl: "http://localhost:3000/?gist=abc123",
     });

@@ -1,4 +1,6 @@
-export type DatastoreUri = `gist:${string}`;
+export type DatastoreProviderId = "gist" | "hosted";
+
+export type DatastoreUri = `gist:${string}` | `hosted:${string}`;
 
 export interface Pet {
   name: string;
@@ -58,7 +60,11 @@ export interface MyRegularsDocument {
 
 export interface DatastoreConnection {
   uri: DatastoreUri;
-  gistId: string;
+  provider: DatastoreProviderId;
+  /** Provider-specific record id (gist id or PocketBase record id). */
+  id: string;
+  /** Present only for the gist provider; retained for back-compat. */
+  gistId?: string;
   shareUrl: string;
 }
 
