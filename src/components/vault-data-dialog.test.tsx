@@ -67,6 +67,9 @@ describe("useVaultDataDialog", () => {
     expect(text).toContain("Coffee Shop");
     // Serialized as the canonical document shape.
     expect(text).toContain('"myregulars"');
+    // The highlighter renders a single space after each key's colon (no double space).
+    expect(text).toContain('"app": "myregulars"');
+    expect(text).not.toMatch(/"app":\s{2,}"myregulars"/);
   });
 
   it("copies the JSON to the clipboard via the Copy JSON button", async () => {
