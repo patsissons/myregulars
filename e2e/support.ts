@@ -102,6 +102,11 @@ function gistResponse() {
 interface SetupOptions {
   /** Extra delay (ms) applied to the single-gist read, to exercise loading UI. */
   gistReadDelayMs?: number;
+  /**
+   * Authenticated user's login. When it differs from the gist owner
+   * (OWNER_LOGIN), the vault loads read-only. Defaults to the owner.
+   */
+  authLogin?: string;
 }
 
 export async function setupVaultApp(page: Page, options: SetupOptions = {}): Promise<void> {
@@ -122,7 +127,7 @@ export async function setupVaultApp(page: Page, options: SetupOptions = {}): Pro
     );
   }, VAULT_URI);
 
-  const { gistReadDelayMs = 0 } = options;
+  const { gistReadDelayMs = 0, authLogin = OWNER_LOGIN } = options;
 
   await page.route("https://api.github.com/**", async (route) => {
     const url = new URL(route.request().url());
@@ -131,7 +136,7 @@ export async function setupVaultApp(page: Page, options: SetupOptions = {}): Pro
 
     // Authenticated user lookup.
     if (pathname === "/user") {
-      return route.fulfill({ json: { login: OWNER_LOGIN, id: 1, avatar_url: "" } });
+      return route.fulfill({ json: { login: authLogin, id: 1, avatar_url: "" } });
     }
 
     // Discovery list — keep empty so only the seeded known vault shows.
