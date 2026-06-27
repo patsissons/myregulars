@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/cn";
 
@@ -12,6 +13,18 @@ interface SheetProps {
 }
 
 export function Sheet({ open, onOpenChange, title, children, className }: SheetProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Start the scroll container at the top when the sheet opens, so a focused
+  // field near the top stays visible instead of the content jumping to the end.
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -29,7 +42,9 @@ export function Sheet({ open, onOpenChange, title, children, className }: SheetP
           style={{
             background: "var(--mr-panel)",
             borderRadius: "20px 20px 0 0",
-            maxHeight: "88vh",
+            // dvh tracks the on-screen keyboard (via interactiveWidget), keeping
+            // the sheet above it so its content stays scrollable.
+            maxHeight: "88dvh",
             display: "flex",
             flexDirection: "column",
             animation: "mrSheetIn 280ms cubic-bezier(.2,.9,.3,1.1) both",
@@ -68,7 +83,16 @@ export function Sheet({ open, onOpenChange, title, children, className }: SheetP
               <Dialog.Description />
             </div>
           )}
-          <div style={{ overflowY: "auto", flex: 1 }}>{children}</div>
+          <div
+            ref={scrollRef}
+            style={{
+              overflowY: "auto",
+              flex: 1,
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+          >
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
