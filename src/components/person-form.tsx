@@ -184,7 +184,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                   }
                 }}
                 autoFocus
-                className="h-7 rounded-full px-3 text-[13px] outline-none"
+                className="h-7 rounded-full px-3 text-[16px] outline-none lg:text-[13px]"
                 style={{
                   background: "var(--mr-subtle)",
                   border: "1px solid var(--mr-edge)",
@@ -277,7 +277,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                   value={newPetName}
                   onChange={(e) => setNewPetName(e.target.value)}
                   autoFocus
-                  className="h-7 w-20 rounded-full px-3 text-[13px] outline-none"
+                  className="h-7 w-20 rounded-full px-3 text-[16px] outline-none lg:text-[13px]"
                   style={{
                     background: "var(--mr-subtle)",
                     border: "1px solid var(--mr-edge)",
@@ -290,7 +290,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                   value={newPetSpecies}
                   onChange={(e) => setNewPetSpecies(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddPet()}
-                  className="h-7 w-20 rounded-full px-3 text-[13px] outline-none"
+                  className="h-7 w-20 rounded-full px-3 text-[16px] outline-none lg:text-[13px]"
                   style={{
                     background: "var(--mr-subtle)",
                     border: "1px solid var(--mr-edge)",

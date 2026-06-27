@@ -119,7 +119,7 @@ export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSe
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          className={`w-full rounded-[8px] py-[6px] pl-[30px] text-[13px] outline-none ${
+          className={`w-full rounded-[8px] py-[6px] pl-[30px] text-[16px] outline-none lg:text-[13px] ${
             showShortcut ? "pr-10" : "pr-3"
           }`}
           style={{
