@@ -28,7 +28,7 @@ export default function PersonPage({
   if (!result || !location) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex min-h-dvh items-center justify-center"
         style={{ background: "var(--mr-bg)" }}
       >
         <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>

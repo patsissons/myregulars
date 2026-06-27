@@ -136,7 +136,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
 
   return (
     <div
-      className="flex min-h-screen flex-col"
+      className="flex min-h-dvh flex-col"
       style={{
         background: "var(--mr-bg)",
         ...(isHistoricalVersion ? { boxShadow: "inset 0 0 0 3px var(--mr-accent)" } : undefined),
