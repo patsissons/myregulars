@@ -12,6 +12,8 @@ test.describe("sign out", () => {
 
     await page.getByRole("button", { name: "Sign out" }).click();
 
-    await expect(page.getByRole("button", { name: /Connect with GitHub/ })).toBeVisible();
+    // Auth gate drops -> redirected to onboarding, identity gone.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText("github.com/testuser")).toHaveCount(0);
   });
 });
