@@ -90,6 +90,7 @@ export default function ConnectPage() {
                 }
                 icon={<Server size={18} style={{ color: "var(--mr-text)" }} />}
                 enabled={true}
+                expanded={hostedExpanded}
                 onClick={() => setHostedExpanded((open) => !open)}
               />
 

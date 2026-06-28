@@ -10,6 +10,8 @@ interface ProviderRowProps {
   isLoading?: boolean;
   error?: string;
   className?: string;
+  /** When set, the chevron rotates to point down (true) or right (false). */
+  expanded?: boolean;
 }
 
 export function ProviderRow({
@@ -21,6 +23,7 @@ export function ProviderRow({
   isLoading,
   error,
   className,
+  expanded,
 }: ProviderRowProps) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
@@ -74,7 +77,15 @@ export function ProviderRow({
             style={{ color: "var(--mr-dim)", flexShrink: 0 }}
           />
         ) : (
-          <ChevronRight size={16} style={{ color: "var(--mr-faint)", flexShrink: 0 }} />
+          <ChevronRight
+            size={16}
+            style={{
+              color: "var(--mr-faint)",
+              flexShrink: 0,
+              transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 150ms ease",
+            }}
+          />
         )}
       </button>
 
