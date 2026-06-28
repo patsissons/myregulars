@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "docs/**",
     "next-env.d.ts",
+    // PocketBase migrations run inside PocketBase's JSVM (custom globals).
+    "pocketbase/**",
   ]),
   {
     files: ["src/**/*.ts"],

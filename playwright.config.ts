@@ -35,5 +35,9 @@ export default defineConfig({
     url: `http://localhost:${port}`,
     reuseExistingServer: false,
     timeout: 120_000,
+    // Enable the hosted (PocketBase) provider UI. No PocketBase instance is
+    // started; specs only exercise the client-side connect surface, and the
+    // hosted discovery path no-ops without a signed-in account.
+    env: { NEXT_PUBLIC_POCKETBASE_URL: "http://127.0.0.1:8090" },
   },
 });

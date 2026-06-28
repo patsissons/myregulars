@@ -4,6 +4,7 @@ import type { KnownVault } from "./vault-types";
 
 const vault1: KnownVault = {
   uri: "gist:abc123",
+  provider: "gist",
   name: "My Vault",
   lastOpened: "2026-04-25T10:00:00.000Z",
   peopleCount: 5,
@@ -12,6 +13,7 @@ const vault1: KnownVault = {
 
 const vault2: KnownVault = {
   uri: "gist:def456",
+  provider: "gist",
   name: "Work Vault",
   lastOpened: "2026-04-24T10:00:00.000Z",
   peopleCount: 3,
@@ -53,6 +55,22 @@ describe("addKnownVault", () => {
     addKnownVault(vault1);
     addKnownVault(vault2);
     expect(getKnownVaults()[0]?.uri).toBe("gist:def456");
+  });
+});
+
+describe("provider backfill", () => {
+  it("derives provider from the uri for legacy entries missing it", () => {
+    localStorage.setItem(
+      "myregulars:known-vaults",
+      JSON.stringify([
+        { uri: "hosted:rec1", name: "Hosted", lastOpened: "x", peopleCount: 0, locationCount: 0 },
+        { uri: "gist:abc", name: "Gist", lastOpened: "x", peopleCount: 0, locationCount: 0 },
+      ]),
+    );
+
+    const vaults = getKnownVaults();
+    expect(vaults.find((v) => v.uri === "hosted:rec1")?.provider).toBe("hosted");
+    expect(vaults.find((v) => v.uri === "gist:abc")?.provider).toBe("gist");
   });
 });
 

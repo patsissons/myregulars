@@ -20,13 +20,9 @@ describe("Home", () => {
     expect(screen.getAllByText(/Remember the people/)[0]).toBeTruthy();
   });
 
-  it("renders mobile Get started button", () => {
+  it("renders provider-neutral Get started CTAs (mobile + desktop)", () => {
     render(<Home />);
-    expect(screen.getByText("Get started")).toBeTruthy();
-  });
-
-  it("renders desktop Connect with GitHub button", () => {
-    render(<Home />);
-    expect(screen.getByText("Connect with GitHub")).toBeTruthy();
+    // Both the mobile and desktop layouts render the same neutral CTA.
+    expect(screen.getAllByText("Get started")).toHaveLength(2);
   });
 });

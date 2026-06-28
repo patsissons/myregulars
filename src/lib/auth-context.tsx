@@ -2,18 +2,40 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { beginGitHubAuth, clearGitHubAuthToken, getGitHubAuthToken } from "@/lib/datastore/auth";
+import { beginHostedAuth, clearHostedAuth, getHostedUser } from "@/lib/datastore/pocketbase-auth";
+import type { HostedAuthProviderId } from "@/lib/datastore/constants";
 import { getAuthenticatedUser } from "@/lib/github-user";
+
+interface ProviderAuthSummary {
+  isAuthenticated: boolean;
+  username: string | null;
+}
 
 interface AuthState {
   isAuthenticated: boolean;
   authToken: string | null;
   username: string | null;
   isLoading: boolean;
+  hosted: ProviderAuthSummary;
 }
 
 interface AuthContextValue extends AuthState {
   login: () => Promise<void>;
   logout: () => void;
+  loginHosted: (provider: HostedAuthProviderId) => Promise<void>;
+  logoutHosted: () => void;
+}
+
+function readHostedSummary(): ProviderAuthSummary {
+  if (typeof window === "undefined") {
+    return { isAuthenticated: false, username: null };
+  }
+
+  const user = getHostedUser();
+  return {
+    isAuthenticated: user !== null,
+    username: user?.name ?? user?.email ?? null,
+  };
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     username: null,
     // start loading only if we have a token (need to fetch username)
     isLoading: !!initialToken,
+    hosted: readHostedSummary(),
   });
   const fetchedRef = useRef(false);
 
@@ -64,16 +87,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     clearGitHubAuthToken();
     fetchedRef.current = false;
-    setState({
+    setState((prev) => ({
+      ...prev,
       isAuthenticated: false,
       authToken: null,
       username: null,
       isLoading: false,
-    });
+    }));
+  }, []);
+
+  const loginHosted = useCallback(async (provider: HostedAuthProviderId) => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      await beginHostedAuth(provider);
+      setState((prev) => ({ ...prev, isLoading: false, hosted: readHostedSummary() }));
+    } catch (error) {
+      setState((prev) => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  }, []);
+
+  const logoutHosted = useCallback(() => {
+    clearHostedAuth();
+    setState((prev) => ({ ...prev, hosted: { isAuthenticated: false, username: null } }));
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ...state, login, logout, loginHosted, logoutHosted }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

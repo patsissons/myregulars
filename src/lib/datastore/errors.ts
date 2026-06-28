@@ -18,3 +18,12 @@ export class DatastoreValidationError extends Error {
     this.name = "DatastoreValidationError";
   }
 }
+
+export class HostedNotConfiguredError extends Error {
+  constructor(
+    message = "Hosted vaults are not configured. Set NEXT_PUBLIC_POCKETBASE_URL to enable them.",
+  ) {
+    super(message);
+    this.name = "HostedNotConfiguredError";
+  }
+}

@@ -6,6 +6,7 @@ import type { KnownVault } from "@/lib/vault-types";
 
 const vault: KnownVault = {
   uri: "gist:abc123",
+  provider: "gist",
   name: "My Regulars",
   lastOpened: "2026-06-20T12:00:00.000Z",
   peopleCount: 4,
@@ -17,6 +18,14 @@ describe("VaultCard", () => {
     render(<VaultCard vault={vault} onClick={() => {}} />);
     expect(screen.getByText("My Regulars")).toBeTruthy();
     expect(screen.getByText("gist:abc123")).toBeTruthy();
+  });
+
+  it("shows a provider badge", () => {
+    render(<VaultCard vault={vault} onClick={() => {}} />);
+    expect(screen.getByText("Gist")).toBeTruthy();
+
+    render(<VaultCard vault={{ ...vault, provider: "hosted" }} onClick={() => {}} />);
+    expect(screen.getByText("Hosted")).toBeTruthy();
   });
 
   it("calls onClick when clicked", async () => {

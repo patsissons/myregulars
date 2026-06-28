@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogoMark } from "@/components/logo-mark";
-import { GitHubMark } from "@/components/icons/github-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { normalizeDatastoreUri } from "@/lib/datastore/uri";
-import { getGistIdFromUri } from "@/lib/datastore/uri";
+import { getVaultRoutePath, normalizeDatastoreUri } from "@/lib/datastore/uri";
 
 const BULLETS = [
   {
@@ -39,8 +37,7 @@ export default function OnboardingPage() {
     if (vaultParam) {
       try {
         const uri = normalizeDatastoreUri(vaultParam);
-        const gistId = getGistIdFromUri(uri);
-        router.push(`/v/${gistId}`);
+        router.push(getVaultRoutePath(uri));
       } catch {
         // Invalid URI, just show onboarding
       }
@@ -61,8 +58,7 @@ export default function OnboardingPage() {
     }
     try {
       const uri = normalizeDatastoreUri(linkInput.trim());
-      const gistId = getGistIdFromUri(uri);
-      router.push(`/v/${gistId}`);
+      router.push(getVaultRoutePath(uri));
     } catch {
       setLinkError("Invalid vault link. Try a gist ID or share URL.");
     }
@@ -94,7 +90,7 @@ export default function OnboardingPage() {
 
         <p className="mt-4 text-[14px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
           A small, private notebook for the regulars in your life. Your data stays in your own
-          GitHub Gist — yours to keep, share, or take with you.
+          datastore — a GitHub Gist or a hosted account — yours to keep, share, or take with you.
         </p>
 
         <div className="mt-8 flex flex-col gap-4">
@@ -157,7 +153,7 @@ export default function OnboardingPage() {
 
           <p className="mt-5 text-[16px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
             A small, private notebook for the regulars in your life. Your data stays in your own
-            GitHub Gist — yours to keep, share, or take with you.
+            datastore — a GitHub Gist or a hosted account — yours to keep, share, or take with you.
           </p>
 
           <div className="mt-8 flex items-center gap-3">
@@ -167,8 +163,7 @@ export default function OnboardingPage() {
               onClick={() => router.push("/connect")}
               className="gap-2"
             >
-              <GitHubMark size={16} />
-              Connect with GitHub
+              Get started
             </Button>
 
             {!showLinkInput ? (

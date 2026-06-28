@@ -61,4 +61,13 @@ describe("ProviderRow", () => {
     render(<ProviderRow {...baseProps} enabled />);
     expect(screen.queryByText("Something failed")).toBeNull();
   });
+
+  it("rotates the chevron down when expanded and right when collapsed", () => {
+    const { container, rerender } = render(<ProviderRow {...baseProps} enabled expanded={false} />);
+    const chevron = container.querySelector(".lucide-chevron-right") as SVGElement;
+    expect(chevron.style.transform).toBe("rotate(0deg)");
+
+    rerender(<ProviderRow {...baseProps} enabled expanded={true} />);
+    expect(chevron.style.transform).toBe("rotate(90deg)");
+  });
 });

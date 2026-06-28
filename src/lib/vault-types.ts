@@ -1,4 +1,4 @@
-import type { Location } from "@/lib/datastore/types";
+import type { DatastoreProviderId, Location } from "@/lib/datastore/types";
 import type { DatastoreUri } from "@/lib/datastore/types";
 
 export interface Vault {
@@ -8,6 +8,7 @@ export interface Vault {
 
 export interface KnownVault {
   uri: DatastoreUri;
+  provider: DatastoreProviderId;
   name: string;
   lastOpened: string;
   peopleCount: number;

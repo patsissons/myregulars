@@ -16,3 +16,16 @@ export const GITHUB_OAUTH_SCOPE = "gist";
 export const GITHUB_OAUTH_START_PATH = "/api/auth/github/start";
 export const GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token";
 export const GITHUB_GISTS_API_URL = "https://api.github.com/gists";
+
+// Hosted (PocketBase) vault provider — social logins surfaced on /connect.
+// The `id` is the PocketBase OAuth2 provider name; the `label` is shown in UI.
+export const HOSTED_AUTH_PROVIDERS = [
+  { id: "github", label: "GitHub" },
+  { id: "google", label: "Google" },
+  { id: "apple", label: "Apple" },
+  { id: "facebook", label: "Meta" },
+  { id: "twitter", label: "X" },
+] as const;
+
+export type HostedAuthProvider = (typeof HOSTED_AUTH_PROVIDERS)[number];
+export type HostedAuthProviderId = HostedAuthProvider["id"];

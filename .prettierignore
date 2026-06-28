@@ -4,3 +4,5 @@ node_modules/
 package-lock.json
 .prettierrc.js
 docs/
+pocketbase/pocketbase
+pocketbase/pb_data/

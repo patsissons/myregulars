@@ -45,3 +45,8 @@ next-env.d.ts
 # athanor
 .athanor
 bin/athanor
+
+# pocketbase (local dev) — keep pb_migrations and README, ignore the rest
+/pocketbase/pocketbase
+/pocketbase/pb_data/
+/pocketbase/*.zip
