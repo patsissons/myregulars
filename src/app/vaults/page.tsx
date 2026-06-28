@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { Server, X } from "lucide-react";
+import { GitHubMark } from "@/components/icons/github-mark";
 import { LogoMark } from "@/components/logo-mark";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 function VaultsContent() {
   const router = useRouter();
-  const { username, isAuthenticated, hosted } = useAuth();
+  const { username, isAuthenticated, hosted, logout, logoutHosted } = useAuth();
   const { createVault, importVault } = useVault();
   const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
 
@@ -233,11 +234,42 @@ function VaultsContent() {
         <div className="mb-2 flex items-center gap-3">
           <LogoMark size={32} />
         </div>
-        {username ? (
-          <Eyebrow className="mb-1 block">Signed in · github.com/{username}</Eyebrow>
-        ) : hosted.username ? (
-          <Eyebrow className="mb-1 block">Signed in · {hosted.username}</Eyebrow>
-        ) : null}
+        {(githubAvailable || hostedAvailable) && (
+          <div className="mb-3 flex flex-col gap-1">
+            {githubAvailable && (
+              <div className="flex items-center gap-2">
+                <GitHubMark size={13} className="text-mr-dim" />
+                <span className="text-[12px]" style={{ color: "var(--mr-dim)" }}>
+                  {username ? `github.com/${username}` : "GitHub"}
+                </span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="text-[12px] underline-offset-2 hover:underline"
+                  style={{ color: "var(--mr-faint)" }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+            {hostedAvailable && (
+              <div className="flex items-center gap-2">
+                <Server size={13} style={{ color: "var(--mr-dim)" }} />
+                <span className="text-[12px]" style={{ color: "var(--mr-dim)" }}>
+                  {hosted.username ?? "Hosted account"}
+                </span>
+                <button
+                  type="button"
+                  onClick={logoutHosted}
+                  className="text-[12px] underline-offset-2 hover:underline"
+                  style={{ color: "var(--mr-faint)" }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <h1
           className="mb-6"
           style={{
