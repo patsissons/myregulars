@@ -25,46 +25,50 @@ owner-scoped via API rules (`owner = @request.auth.id`); snapshots are immutable
 > Migrations target the PocketBase JSVM API (v0.23+, `app`/`fields`) and are verified against
 > v0.39.4. If you run an older release, regenerate them from the Admin UI.
 
+## Configuration
+
+Config is split across two files (both read by the launcher and by Next.js):
+
+- **`.env`** — committed, non-secret defaults: `NEXT_PUBLIC_POCKETBASE_URL`, `PB_HOST`, `PB_PORT`,
+  `PB_VERSION`, `PB_SUPERUSER_EMAIL`.
+- **`.env.local`** — gitignored secrets: `PB_SUPERUSER_PASSWORD`, the `PB_OAUTH2_<PROVIDER>_CLIENT_ID`
+  / `_CLIENT_SECRET` pairs, and the gist `GITHUB_OAUTH_*` credentials. See `.env.example`.
+
 ## Local setup
 
-1. Start PocketBase (downloads the binary on first run, applies migrations):
+```bash
+npm run dev      # web app + PocketBase together
+# or just PocketBase:
+npm run dev:pb
+```
 
-   ```bash
-   npm run dev:pb
-   ```
+On startup the launcher (`scripts/pocketbase.sh`) lazily initializes everything it needs:
 
-   Or run the web app and PocketBase together with `npm run dev`.
+1. downloads the PocketBase binary on first run,
+2. applies the committed migrations (collections),
+3. ensures a superuser from `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`,
+4. configures the social-login OAuth2 providers for every `PB_OAUTH2_<PROVIDER>_*` pair set in
+   `.env.local`.
 
-   Overrides: `PB_VERSION`, `PB_HOST`, `PB_PORT`.
+So enabling a social login is just: add its client ID/secret to `.env.local` and restart. No manual
+Admin UI steps. (You can still open the Admin UI at http://127.0.0.1:8090/\_/ with the superuser
+credentials.)
 
-2. Open the Admin UI at http://127.0.0.1:8090/\_/ and create the first superuser.
+## Social login (OAuth2) providers
 
-3. Configure social logins (see next section). At minimum enable **GitHub**.
+Client IDs/secrets are **not** committed — put them in `.env.local` and the launcher applies them to
+the `users` collection on startup. Create each OAuth app here:
 
-4. In the Next.js app, set:
+| App label | `.env.local` key prefix | Create the OAuth app at                             |
+| --------- | ----------------------- | --------------------------------------------------- |
+| GitHub    | `PB_OAUTH2_GITHUB_*`    | GitHub → Settings → Developer settings → OAuth Apps |
+| Google    | `PB_OAUTH2_GOOGLE_*`    | Google Cloud Console → Credentials                  |
+| Apple     | `PB_OAUTH2_APPLE_*`     | Apple Developer → Certificates, Identifiers         |
+| Meta      | `PB_OAUTH2_FACEBOOK_*`  | Meta for Developers → My Apps                       |
+| X         | `PB_OAUTH2_TWITTER_*`   | X Developer Portal → Projects & Apps                |
 
-   ```bash
-   NEXT_PUBLIC_POCKETBASE_URL=http://127.0.0.1:8090
-   ```
-
-   then `npm run dev`.
-
-## Social login (OAuth2) configuration
-
-Client IDs/secrets are **not** committed — configure them inside PocketBase: **Admin UI → Collections
-→ `users` → Options → OAuth2**. Enable the providers and paste each app's credentials.
-
-Supported providers in the app's `/connect` screen:
-
-| App label | PocketBase provider | Create the OAuth app at                             |
-| --------- | ------------------- | --------------------------------------------------- |
-| GitHub    | `github`            | GitHub → Settings → Developer settings → OAuth Apps |
-| Google    | `google`            | Google Cloud Console → Credentials                  |
-| Apple     | `apple`             | Apple Developer → Certificates, Identifiers         |
-| Meta      | `facebook`          | Meta for Developers → My Apps                       |
-| X         | `twitter`           | X Developer Portal → Projects & Apps                |
-
-For each provider, set the **redirect/callback URL** to your PocketBase instance's OAuth2 redirect:
+Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider, set the
+**redirect/callback URL** to your PocketBase instance's OAuth2 redirect:
 `<NEXT_PUBLIC_POCKETBASE_URL>/api/oauth2-redirect`.
 
 ## Production (PocketHost)
