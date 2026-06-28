@@ -95,9 +95,7 @@ export default function ConnectPage() {
               />
 
               {hostedExpanded && (
-                <div className="pl-2">
-                  <HostedAuthButtons onAuthenticated={() => router.push(returnTo)} />
-                </div>
+                <HostedAuthButtons onAuthenticated={() => router.push(returnTo)} />
               )}
             </div>
           )}

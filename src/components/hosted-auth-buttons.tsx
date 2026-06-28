@@ -74,8 +74,7 @@ export function HostedAuthButtons({ onAuthenticated }: HostedAuthButtonsProps) {
           type="button"
           onClick={() => handleConnect(provider.id)}
           disabled={pending !== null}
-          className="hover:bg-mr-subtle flex w-full items-center gap-3 rounded-[12px] border p-3 text-left transition-colors disabled:cursor-not-allowed"
-          style={{ background: "var(--mr-panel)", borderColor: "var(--mr-edge)" }}
+          className="bg-mr-panel border-mr-edge hover:bg-mr-subtle flex w-full items-center gap-3 rounded-[12px] border p-3 text-left transition-colors disabled:cursor-not-allowed"
         >
           <HostedProviderMark provider={provider.id} size={18} />
           <span className="flex-1 text-[14px] font-[500]" style={{ color: "var(--mr-text)" }}>

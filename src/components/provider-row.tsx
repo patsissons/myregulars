@@ -32,14 +32,11 @@ export function ProviderRow({
         onClick={enabled ? onClick : undefined}
         disabled={!enabled || isLoading}
         className={cn(
-          "flex w-full items-center gap-3 rounded-[14px] p-[14px] text-left transition-colors duration-100",
-          "border",
+          "bg-mr-panel border-mr-edge flex w-full items-center gap-3 rounded-[14px] border p-[14px] text-left transition-colors duration-100",
           enabled && !isLoading && "hover:bg-mr-subtle active:opacity-80",
           (!enabled || isLoading) && "cursor-not-allowed",
         )}
         style={{
-          background: "var(--mr-panel)",
-          borderColor: "var(--mr-edge)",
           opacity: enabled ? 1 : 0.55,
         }}
       >
