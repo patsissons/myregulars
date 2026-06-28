@@ -4,7 +4,8 @@ The **Hosted vault** provider stores each vault as a record in a [PocketBase](ht
 instance. Unlike GitHub Gist vaults, hosted vaults require an authenticated user account (social
 login), and every save appends a snapshot so version history works just like gists.
 
-- **Local development:** a PocketBase binary launched by `npm run pb:dev`.
+- **Local development:** a PocketBase binary launched by `npm run dev:pb` (or `npm run dev`, which
+  runs the web app and PocketBase together).
 - **Production:** a remote instance (e.g. [PocketHost](https://pockethost.io)).
 
 This directory holds the committed schema (`pb_migrations/`). The binary and `pb_data/` are
@@ -29,8 +30,10 @@ owner-scoped via API rules (`owner = @request.auth.id`); snapshots are immutable
 1. Start PocketBase (downloads the binary on first run, applies migrations):
 
    ```bash
-   npm run pb:dev
+   npm run dev:pb
    ```
+
+   Or run the web app and PocketBase together with `npm run dev`.
 
    Overrides: `PB_VERSION`, `PB_HOST`, `PB_PORT`.
 

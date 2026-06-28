@@ -24,9 +24,16 @@ resolve_version() {
     echo "$PB_VERSION"
     return
   fi
-  curl -fsSL https://api.github.com/repos/pocketbase/pocketbase/releases/latest |
-    grep -m1 '"tag_name"' |
-    sed -E 's/.*"v?([^"]+)".*/\1/'
+  # Materialize the response first: piping curl straight into `grep -m1` makes
+  # grep close the pipe early, which SIGPIPEs curl (exit 23) and, under
+  # `set -o pipefail`, aborts the whole script.
+  local body
+  body="$(curl -fsSL https://api.github.com/repos/pocketbase/pocketbase/releases/latest)" || return 1
+  # Parse with pipefail disabled so a benign SIGPIPE from grep -m1 can't fail us.
+  (
+    set +o pipefail
+    printf '%s\n' "$body" | grep -m1 '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/'
+  )
 }
 
 download() {

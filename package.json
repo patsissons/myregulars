@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -n web,pb -c blue,green \"npm:dev:web\" \"npm:dev:pb\"",
+    "dev:web": "next dev",
+    "dev:pb": "bash scripts/pocketbase.sh",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -13,8 +15,7 @@
     "test": "vitest run",
     "test:e2e": "playwright install chromium && playwright test --pass-with-no-tests --reporter=list",
     "validate": "npm run format:check && npm run typecheck && npm run lint && npm test",
-    "format-and-validate": "npm run format && npm run validate",
-    "pb:dev": "bash scripts/pocketbase.sh"
+    "format-and-validate": "npm run format && npm run validate"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -41,6 +42,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "get-port": "^7.2.0",
