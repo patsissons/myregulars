@@ -65,7 +65,8 @@ export default function ConnectPage() {
             Connect a datastore
           </h1>
           <p className="text-[14px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
-            Your vaults live in your own datastore. Pick a provider — you can always add more later.
+            Choose where your vaults are stored. Each provider keeps your data in a different place
+            — you can always add more later.
           </p>
         </div>
 
