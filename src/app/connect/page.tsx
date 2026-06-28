@@ -1,24 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Loader2, Server } from "lucide-react";
+import { ChevronLeft, Server } from "lucide-react";
 import { GitHubMark } from "@/components/icons/github-mark";
-import { HostedProviderMark } from "@/components/icons/social-marks";
+import { HostedAuthButtons } from "@/components/hosted-auth-buttons";
 import { ProviderRow } from "@/components/provider-row";
 import { IconButton } from "@/components/ui/icon-button";
 import { useAuth } from "@/lib/auth-context";
-import type { HostedAuthProviderId } from "@/lib/datastore/constants";
-import { listHostedAuthProviders } from "@/lib/datastore/pocketbase-auth";
 import { isHostedConfigured } from "@/lib/datastore/pocketbase-config";
 
 export default function ConnectPage() {
   const router = useRouter();
-  const { isAuthenticated, login, loginHosted } = useAuth();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [hostedExpanded, setHostedExpanded] = useState(false);
-  const [pendingProvider, setPendingProvider] = useState<HostedAuthProviderId | null>(null);
 
   const hostedEnabled = isHostedConfigured();
 
@@ -27,12 +24,6 @@ export default function ConnectPage() {
     typeof window !== "undefined"
       ? (new URLSearchParams(window.location.search).get("returnTo") ?? "/vaults")
       : "/vaults";
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push(returnTo);
-    }
-  }, [isAuthenticated, returnTo, router]);
 
   async function handleGitHubConnect() {
     setIsLoading(true);
@@ -43,18 +34,6 @@ export default function ConnectPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "GitHub authorization failed.");
       setIsLoading(false);
-    }
-  }
-
-  async function handleHostedConnect(provider: HostedAuthProviderId) {
-    setPendingProvider(provider);
-    setError("");
-    try {
-      await loginHosted(provider);
-      router.push(returnTo);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed.");
-      setPendingProvider(null);
     }
   }
 
@@ -99,7 +78,7 @@ export default function ConnectPage() {
             enabled={true}
             onClick={handleGitHubConnect}
             isLoading={isLoading}
-            error={error && !pendingProvider ? error : undefined}
+            error={error || undefined}
           />
 
           {hostedEnabled && (
@@ -115,37 +94,8 @@ export default function ConnectPage() {
               />
 
               {hostedExpanded && (
-                <div className="flex flex-col gap-2 pl-2">
-                  {listHostedAuthProviders().map((provider) => (
-                    <button
-                      key={provider.id}
-                      type="button"
-                      onClick={() => handleHostedConnect(provider.id)}
-                      disabled={pendingProvider !== null}
-                      className="hover:bg-mr-subtle flex w-full items-center gap-3 rounded-[12px] border p-3 text-left transition-colors disabled:cursor-not-allowed"
-                      style={{ background: "var(--mr-panel)", borderColor: "var(--mr-edge)" }}
-                    >
-                      <HostedProviderMark provider={provider.id} size={18} />
-                      <span
-                        className="flex-1 text-[14px] font-[500]"
-                        style={{ color: "var(--mr-text)" }}
-                      >
-                        Continue with {provider.label}
-                      </span>
-                      {pendingProvider === provider.id && (
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                          style={{ color: "var(--mr-dim)" }}
-                        />
-                      )}
-                    </button>
-                  ))}
-                  {error && pendingProvider === null && (
-                    <p className="px-1 text-[13px]" style={{ color: "var(--mr-danger)" }}>
-                      {error}
-                    </p>
-                  )}
+                <div className="pl-2">
+                  <HostedAuthButtons onAuthenticated={() => router.push(returnTo)} />
                 </div>
               )}
             </div>

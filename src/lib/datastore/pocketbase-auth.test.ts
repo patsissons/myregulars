@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   beginHostedAuth,
   clearHostedAuth,
+  fetchEnabledHostedProviders,
   getHostedAuthToken,
   getHostedUser,
   isHostedAuthenticated,
@@ -10,8 +11,9 @@ import {
 } from "@/lib/datastore/pocketbase-auth";
 import { AuthRequiredError } from "@/lib/datastore/errors";
 
-const { fakeClient, authWithOAuth2 } = vi.hoisted(() => {
+const { fakeClient, authWithOAuth2, listAuthMethods } = vi.hoisted(() => {
   const authWithOAuth2 = vi.fn();
+  const listAuthMethods = vi.fn();
   const fakeClient = {
     authStore: {
       token: "",
@@ -19,9 +21,9 @@ const { fakeClient, authWithOAuth2 } = vi.hoisted(() => {
       isValid: false,
       clear: vi.fn(),
     },
-    collection: () => ({ authWithOAuth2 }),
+    collection: () => ({ authWithOAuth2, listAuthMethods }),
   };
-  return { fakeClient, authWithOAuth2 };
+  return { fakeClient, authWithOAuth2, listAuthMethods };
 });
 
 vi.mock("@/lib/datastore/pocketbase-config", () => ({
@@ -86,5 +88,19 @@ describe("pocketbase auth", () => {
     signIn("tok", { id: "user1" });
     clearHostedAuth();
     expect(fakeClient.authStore.clear).toHaveBeenCalled();
+  });
+
+  it("returns only the enabled providers from the instance", async () => {
+    listAuthMethods.mockResolvedValueOnce({
+      oauth2: { enabled: true, providers: [{ name: "github" }, { name: "google" }] },
+    });
+
+    const enabled = await fetchEnabledHostedProviders();
+    expect(enabled?.map((p) => p.id)).toEqual(["github", "google"]);
+  });
+
+  it("returns null when the instance can't be reached", async () => {
+    listAuthMethods.mockRejectedValueOnce(new Error("offline"));
+    await expect(fetchEnabledHostedProviders()).resolves.toBeNull();
   });
 });

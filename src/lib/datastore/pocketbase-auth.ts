@@ -1,5 +1,5 @@
 import { HOSTED_AUTH_PROVIDERS } from "@/lib/datastore/constants";
-import type { HostedAuthProviderId } from "@/lib/datastore/constants";
+import type { HostedAuthProvider, HostedAuthProviderId } from "@/lib/datastore/constants";
 import { AuthRequiredError, HostedNotConfiguredError } from "@/lib/datastore/errors";
 import { getPocketBaseClient, isHostedConfigured } from "@/lib/datastore/pocketbase-config";
 
@@ -15,9 +15,29 @@ interface HostedUserRecord {
   name?: string;
 }
 
-/** The social-login providers offered for hosted vaults. */
+/** The social-login providers the app supports for hosted vaults. */
 export function listHostedAuthProviders(): typeof HOSTED_AUTH_PROVIDERS {
   return HOSTED_AUTH_PROVIDERS;
+}
+
+/**
+ * The supported providers that are actually enabled on the PocketBase instance.
+ * Returns null when the instance can't be reached (so callers can fall back to
+ * the full supported list), or [] when reachable but no providers are enabled.
+ */
+export async function fetchEnabledHostedProviders(): Promise<HostedAuthProvider[] | null> {
+  if (!isHostedConfigured()) {
+    return [];
+  }
+
+  try {
+    const client = getPocketBaseClient();
+    const methods = await client.collection("users").listAuthMethods();
+    const enabled = new Set((methods.oauth2?.providers ?? []).map((provider) => provider.name));
+    return HOSTED_AUTH_PROVIDERS.filter((provider) => enabled.has(provider.id));
+  } catch {
+    return null;
+  }
 }
 
 /** Current hosted auth token, or null when not configured / signed out. */

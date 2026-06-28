@@ -27,4 +27,5 @@ export const HOSTED_AUTH_PROVIDERS = [
   { id: "twitter", label: "X" },
 ] as const;
 
-export type HostedAuthProviderId = (typeof HOSTED_AUTH_PROVIDERS)[number]["id"];
+export type HostedAuthProvider = (typeof HOSTED_AUTH_PROVIDERS)[number];
+export type HostedAuthProviderId = HostedAuthProvider["id"];

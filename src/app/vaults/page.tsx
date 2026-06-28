@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { VaultCard, NewVaultCard, ImportVaultCard } from "@/components/vault-card";
+import { HostedAuthButtons } from "@/components/hosted-auth-buttons";
 import { useAuth } from "@/lib/auth-context";
 import { VaultProvider, useVault } from "@/lib/vault-context";
 import { discoverDatastores } from "@/lib/db";
+import { isHostedConfigured } from "@/lib/datastore/pocketbase-config";
 import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
 import {
   getIdFromUri,
@@ -32,14 +34,21 @@ function VaultsContent() {
 
   const githubAvailable = isAuthenticated;
   const hostedAvailable = hosted.isAuthenticated;
-  const bothAvailable = githubAvailable && hostedAvailable;
   const [createProvider, setCreateProvider] = useState<DatastoreProviderId>("gist");
-  // When only one provider is connected, force it; otherwise honour the choice.
-  const effectiveProvider: DatastoreProviderId = bothAvailable
+
+  // Providers the user can create in: gist when signed into GitHub, hosted
+  // whenever a PocketBase instance is configured (sign-in happens in the modal).
+  const providerOptions: { id: DatastoreProviderId; label: string }[] = [
+    ...(githubAvailable ? [{ id: "gist" as const, label: "GitHub Gist" }] : []),
+    ...(isHostedConfigured() ? [{ id: "hosted" as const, label: "Hosted vault" }] : []),
+  ];
+  const effectiveProvider: DatastoreProviderId = providerOptions.some(
+    (option) => option.id === createProvider,
+  )
     ? createProvider
-    : githubAvailable
-      ? "gist"
-      : "hosted";
+    : (providerOptions[0]?.id ?? "gist");
+  // Hosted vault chosen but not signed in yet — the modal shows sign-in first.
+  const needsHostedLogin = effectiveProvider === "hosted" && !hostedAvailable;
   // Read from localStorage in lazy initializer (client-only component)
   const [vaults, setVaults] = useState<KnownVault[]>(() =>
     typeof localStorage !== "undefined" ? getKnownVaults() : [],
@@ -321,17 +330,12 @@ function VaultsContent() {
         title="New vault"
       >
         <div className="flex flex-col gap-4 p-5">
-          {bothAvailable && (
+          {providerOptions.length > 1 && (
             <div className="flex flex-col gap-2">
               <Eyebrow>Store in</Eyebrow>
               <div className="flex gap-2">
-                {(
-                  [
-                    { id: "gist", label: "GitHub Gist" },
-                    { id: "hosted", label: "Hosted vault" },
-                  ] as const
-                ).map((option) => {
-                  const active = createProvider === option.id;
+                {providerOptions.map((option) => {
+                  const active = effectiveProvider === option.id;
                   return (
                     <button
                       key={option.id}
@@ -351,25 +355,37 @@ function VaultsContent() {
               </div>
             </div>
           )}
-          <Input
-            placeholder="My regulars"
-            value={newVaultName}
-            onChange={(e) => setNewVaultName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isCreating && handleCreateVault()}
-            autoFocus
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreateVault}
-              disabled={!newVaultName.trim() || isCreating}
-            >
-              {isCreating ? "Creating…" : "Create vault"}
-            </Button>
-          </div>
+
+          {needsHostedLogin ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
+                Sign in to a hosted account to create this vault.
+              </p>
+              <HostedAuthButtons />
+            </div>
+          ) : (
+            <>
+              <Input
+                placeholder="My regulars"
+                value={newVaultName}
+                onChange={(e) => setNewVaultName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !isCreating && handleCreateVault()}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateVault}
+                  disabled={!newVaultName.trim() || isCreating}
+                >
+                  {isCreating ? "Creating…" : "Create vault"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
