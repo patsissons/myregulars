@@ -68,6 +68,20 @@ export function HostedAuthButtons({ onAuthenticated }: HostedAuthButtonsProps) {
 
   return (
     <div className="flex flex-col gap-2">
+      <div
+        className="rounded-[10px] border p-2.5 text-[12px] leading-relaxed"
+        style={{
+          borderColor: "var(--mr-edge)",
+          background: "var(--mr-subtle)",
+          color: "var(--mr-dim)",
+        }}
+      >
+        <strong style={{ color: "var(--mr-text)" }}>
+          Heads up — hosted vaults are stored on the server.
+        </strong>{" "}
+        Unlike a GitHub Gist (which stays in your own GitHub account), a hosted vault&apos;s data
+        lives on the hosted instance you sign into.
+      </div>
       {providers.map((provider) => (
         <button
           key={provider.id}

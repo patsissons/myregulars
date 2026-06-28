@@ -86,7 +86,9 @@ export default function ConnectPage() {
               <ProviderRow
                 name="Hosted vault"
                 description={
-                  hostedExpanded ? "Choose a sign-in method" : "Sign in to sync to a hosted account"
+                  hostedExpanded
+                    ? "Choose a sign-in method"
+                    : "Stored on a hosted server · sign-in required"
                 }
                 icon={<Server size={18} style={{ color: "var(--mr-text)" }} />}
                 enabled={true}
@@ -106,8 +108,8 @@ export default function ConnectPage() {
           className="mt-6 text-center text-[12px] leading-relaxed"
           style={{ color: "var(--mr-faint)" }}
         >
-          We never store your data. GitHub Gists keep vaults in your account; hosted vaults sync to
-          your signed-in account.
+          GitHub Gists keep your vaults in your own GitHub account — we never store them. Hosted
+          vaults are stored on the hosted server you sign into.
         </p>
       </div>
     </div>
