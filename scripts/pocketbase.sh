@@ -105,48 +105,6 @@ ensure_superuser() {
   fi
 }
 
-# ── Lazy init: social-login OAuth2 providers ─────────────────────────────────
-configure_oauth2() {
-  local providers="" entry
-  add_provider() { # name, client_id, client_secret
-    [ -n "$2" ] && [ -n "$3" ] || return 0
-    entry="$(printf '{"name":"%s","clientId":"%s","clientSecret":"%s"}' "$1" "$2" "$3")"
-    providers="${providers:+$providers,}$entry"
-  }
-  add_provider github "${PB_OAUTH2_GITHUB_CLIENT_ID:-}" "${PB_OAUTH2_GITHUB_CLIENT_SECRET:-}"
-  add_provider google "${PB_OAUTH2_GOOGLE_CLIENT_ID:-}" "${PB_OAUTH2_GOOGLE_CLIENT_SECRET:-}"
-  add_provider apple "${PB_OAUTH2_APPLE_CLIENT_ID:-}" "${PB_OAUTH2_APPLE_CLIENT_SECRET:-}"
-  add_provider facebook "${PB_OAUTH2_FACEBOOK_CLIENT_ID:-}" "${PB_OAUTH2_FACEBOOK_CLIENT_SECRET:-}"
-  add_provider twitter "${PB_OAUTH2_TWITTER_CLIENT_ID:-}" "${PB_OAUTH2_TWITTER_CLIENT_SECRET:-}"
-
-  if [ -z "$providers" ]; then
-    echo "No OAuth2 provider secrets set — social login disabled (set PB_OAUTH2_* in .env.local)."
-    return 0
-  fi
-  if [ -z "${PB_SUPERUSER_EMAIL:-}" ] || [ -z "${PB_SUPERUSER_PASSWORD:-}" ]; then
-    echo "Superuser creds required to configure OAuth2 — skipping." >&2
-    return 0
-  fi
-
-  local token
-  token="$(curl -fsS -X POST "$BASE_URL/api/collections/_superusers/auth-with-password" \
-    -H "Content-Type: application/json" \
-    -d "$(printf '{"identity":"%s","password":"%s"}' "$PB_SUPERUSER_EMAIL" "$PB_SUPERUSER_PASSWORD")" 2>/dev/null |
-    sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
-  if [ -z "$token" ]; then
-    echo "Warning: could not authenticate superuser to configure OAuth2." >&2
-    return 0
-  fi
-
-  if curl -fsS -X PATCH "$BASE_URL/api/collections/users" \
-    -H "Authorization: $token" -H "Content-Type: application/json" \
-    -d "$(printf '{"oauth2":{"enabled":true,"providers":[%s]}}' "$providers")" >/dev/null 2>&1; then
-    echo "Configured OAuth2 social-login providers."
-  else
-    echo "Warning: failed to configure OAuth2 providers." >&2
-  fi
-}
-
 # ── Boot ─────────────────────────────────────────────────────────────────────
 if [ ! -x "$BIN" ]; then
   download
@@ -155,28 +113,13 @@ fi
 ensure_superuser
 
 echo "Starting PocketBase on $BASE_URL (admin UI at /_/)"
-# --automigrate=0: still applies the committed migrations on boot, but does NOT
-# write auto-generated migration files when configure_oauth2 patches the users
-# collection (which would otherwise pollute the committed pb_migrations dir).
-"$BIN" serve \
+# The pb_hooks bootstrap (pocketbase/pb_hooks/main.pb.js) configures OAuth2
+# providers from PB_OAUTH2_* env vars on startup — the same mechanism works on
+# PocketHost. --automigrate=0 so that config change isn't written as a migration
+# file into the committed pb_migrations dir.
+exec "$BIN" serve \
   --dir="$PB_DIR/pb_data" \
   --migrationsDir="$PB_DIR/pb_migrations" \
+  --hooksDir="$PB_DIR/pb_hooks" \
   --automigrate=0 \
-  --http="${PB_HOST}:${PB_PORT}" &
-PB_PID=$!
-trap 'kill "$PB_PID" 2>/dev/null || true' INT TERM
-
-# Once the server is healthy, apply the remaining lazy init (OAuth2 providers).
-(
-  for _ in $(seq 1 100); do
-    kill -0 "$PB_PID" 2>/dev/null || exit 0 # server died; nothing to configure
-    if curl -fsS -o /dev/null "$BASE_URL/api/health" 2>/dev/null; then
-      configure_oauth2
-      exit 0
-    fi
-    sleep 0.3
-  done
-  echo "Warning: PocketBase did not become healthy in time; skipped OAuth2 config." >&2
-) &
-
-wait "$PB_PID"
+  --http="${PB_HOST}:${PB_PORT}"
