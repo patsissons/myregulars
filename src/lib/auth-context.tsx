@@ -71,6 +71,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // No else branch: isLoading is already false when no token (set in initial state)
   }, [fetchAndSetUser]);
 
+  // Re-sync auth state when the tab resumes (iOS Safari freezes tabs; the
+  // token may have expired, been cleared by a 401 handler, or been created by
+  // an auth flow in another tab while this tab was frozen).
+  useEffect(() => {
+    function revalidate() {
+      const token = getGitHubAuthToken();
+      const hosted = readHostedSummary();
+      setState((prev) => {
+        if (
+          !!token === prev.isAuthenticated &&
+          token === prev.authToken &&
+          hosted.isAuthenticated === prev.hosted.isAuthenticated &&
+          hosted.username === prev.hosted.username
+        ) {
+          return prev;
+        }
+        if (!token) {
+          fetchedRef.current = false;
+          return {
+            ...prev,
+            isAuthenticated: false,
+            authToken: null,
+            username: null,
+            isLoading: false,
+            hosted,
+          };
+        }
+        return { ...prev, isAuthenticated: true, authToken: token, hosted };
+      });
+      if (token && !fetchedRef.current) {
+        fetchedRef.current = true;
+        void fetchAndSetUser();
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") revalidate();
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", revalidate);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", revalidate);
+    };
+  }, [fetchAndSetUser]);
+
   const login = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
