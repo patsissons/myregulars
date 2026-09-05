@@ -2,6 +2,7 @@ import {
   DATASTORE_FILE_NAME,
   DATASTORE_FILE_PATTERN,
   GITHUB_GISTS_API_URL,
+  REQUEST_TIMEOUT_MS,
 } from "@/lib/datastore/constants";
 import { AuthRequiredError, DatastoreValidationError } from "@/lib/datastore/errors";
 import { clearGitHubAuthToken } from "@/lib/datastore/auth";
@@ -138,7 +139,11 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
 
   constructor(options: GistStorageAdapterOptions = {}) {
     this.authToken = options.authToken ?? null;
-    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    const base = options.fetchImpl ?? fetch.bind(globalThis);
+    // Idle mobile tabs resume with half-open sockets; a default timeout keeps
+    // gist requests from hanging forever.
+    this.fetchImpl = (input, init) =>
+      base(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     this.fileName = options.fileName ?? DATASTORE_FILE_NAME;
   }
 
