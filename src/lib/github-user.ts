@@ -1,4 +1,5 @@
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
+import { REQUEST_TIMEOUT_MS } from "@/lib/datastore/constants";
 
 interface GitHubUser {
   login: string;
@@ -16,6 +17,7 @@ export async function getAuthenticatedUser(): Promise<GitHubUser | null> {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github.v3+json",
       },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) return null;

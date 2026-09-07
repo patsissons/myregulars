@@ -1,4 +1,5 @@
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
+import { REQUEST_TIMEOUT_MS } from "@/lib/datastore/constants";
 import { getHostedAuthToken, getHostedUser } from "@/lib/datastore/pocketbase-auth";
 import { getGistIdFromUri, getProviderFromUri } from "@/lib/datastore/uri";
 import { getAuthenticatedUser } from "@/lib/github-user";
@@ -47,6 +48,7 @@ async function resolveGistOwnership(uri: DatastoreUri): Promise<VaultOwnership> 
     headers: token
       ? { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" }
       : { Accept: "application/vnd.github.v3+json" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {

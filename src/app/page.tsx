@@ -37,7 +37,7 @@ export default function OnboardingPage() {
     if (vaultParam) {
       try {
         const uri = normalizeDatastoreUri(vaultParam);
-        router.push(getVaultRoutePath(uri));
+        router.replace(getVaultRoutePath(uri));
       } catch {
         // Invalid URI, just show onboarding
       }
@@ -47,7 +47,7 @@ export default function OnboardingPage() {
   // Redirect authenticated users to /vaults
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/vaults");
+      router.replace("/vaults");
     }
   }, [isAuthenticated, router]);
 

@@ -1,5 +1,6 @@
 import PocketBase from "pocketbase";
 
+import { REQUEST_TIMEOUT_MS } from "@/lib/datastore/constants";
 import { HostedNotConfiguredError } from "@/lib/datastore/errors";
 
 /**
@@ -27,6 +28,12 @@ export function getPocketBaseClient(): PocketBase {
 
   if (!sharedClient) {
     sharedClient = new PocketBase(POCKETBASE_URL);
+    // Idle mobile tabs resume with half-open sockets; a default timeout keeps
+    // hosted-vault requests from hanging forever.
+    sharedClient.beforeSend = (url, options) => ({
+      url,
+      options: { ...options, signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+    });
   }
 
   return sharedClient;

@@ -1,4 +1,10 @@
 export const DATASTORE_FILE_NAME = "myregulars.json";
+
+/**
+ * Default timeout for datastore/auth network requests. Idle mobile tabs resume
+ * with half-open sockets; without a timeout those requests hang forever.
+ */
+export const REQUEST_TIMEOUT_MS = 15_000;
 export const DATASTORE_FILE_PATTERN = /^myregulars\.[^.]+\.json$/;
 export const DATASTORE_APP_NAME = "myregulars";
 export const DATASTORE_SCHEMA_VERSION = 1;

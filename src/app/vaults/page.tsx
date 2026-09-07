@@ -522,7 +522,7 @@ export default function VaultsPage() {
 
   useEffect(() => {
     if (!isLoading && !authed) {
-      router.push("/");
+      router.replace("/");
     }
   }, [authed, isLoading, router]);
 
