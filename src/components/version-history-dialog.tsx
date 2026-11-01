@@ -1,23 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useIsMobile } from "@/lib/use-media";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 import { listDatastoreVersions } from "@/lib/db";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { useVault } from "@/lib/vault-context";
 import type { VersionInfo } from "@/lib/datastore/types";
-
-function subscribeToResize(cb: () => void): () => void {
-  window.addEventListener("resize", cb);
-  return () => window.removeEventListener("resize", cb);
-}
-function getIsMobile(): boolean {
-  return window.innerWidth < 1024;
-}
-function getIsMobileServer(): boolean {
-  return false;
-}
 
 function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: string }) {
   const { historicalVersionId } = useVault();
@@ -171,7 +161,7 @@ function VersionHistoryDialogComponent({
   onClose,
   vaultId,
 }: VersionHistoryDialogComponentProps) {
-  const isMobile = useSyncExternalStore(subscribeToResize, getIsMobile, getIsMobileServer);
+  const isMobile = useIsMobile();
 
   const content = open ? <VersionHistoryContent vaultId={vaultId} /> : null;
 

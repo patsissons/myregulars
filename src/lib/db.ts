@@ -1,7 +1,7 @@
 import { GistStorageAdapter } from "@/lib/datastore/gist-adapter";
 import { PocketBaseStorageAdapter } from "@/lib/datastore/pocketbase-adapter";
 import { beginGitHubAuth as startGitHubAuth, getGitHubAuthToken } from "@/lib/datastore/auth";
-import { createDatastoreCache } from "@/lib/datastore/cache";
+import { createDatastoreCache, type OutboxEntry } from "@/lib/datastore/cache";
 import { contentHash } from "@/lib/datastore/content-hash";
 import {
   AuthRequiredError,
@@ -118,9 +118,37 @@ function snapshotFromAdapter(
 }
 
 async function cacheSnapshot(snapshot: DatastoreSnapshot): Promise<DatastoreSnapshot> {
-  await datastoreCache.set(snapshot);
-  datastoreCache.setPreferredUri(snapshot.uri);
-  return snapshot;
+  // Ownership is resolved separately from the read; keep what we knew.
+  const previous = snapshot.ownership ? null : await datastoreCache.get(snapshot.uri);
+  const merged = previous?.ownership ? { ...snapshot, ownership: previous.ownership } : snapshot;
+  await datastoreCache.set(merged);
+  datastoreCache.setPreferredUri(merged.uri);
+  return merged;
+}
+
+/** Records the current user's access to a vault alongside its cached copy. */
+export async function rememberVaultOwnership(
+  uri: string,
+  ownership: NonNullable<DatastoreSnapshot["ownership"]>,
+): Promise<void> {
+  const connection = resolveConnection(uri);
+  const cached = await datastoreCache.get(connection.uri);
+  if (cached) {
+    await datastoreCache.set({ ...cached, ownership });
+  }
+}
+
+/** Unsaved edits persisted for a vault, if any. */
+export async function readOutbox(uri: string): Promise<OutboxEntry | null> {
+  return datastoreCache.getOutbox(resolveConnection(uri).uri);
+}
+
+export async function writeOutbox(entry: OutboxEntry): Promise<void> {
+  await datastoreCache.setOutbox(entry);
+}
+
+export async function clearOutbox(uri: string): Promise<void> {
+  await datastoreCache.clearOutbox(resolveConnection(uri).uri);
 }
 
 function resolveConnection(uri: string): DatastoreConnection {
@@ -634,3 +662,5 @@ export async function discoverDatastores(): Promise<DiscoveredVault[]> {
 export function getPreferredDatastoreUri(): DatastoreUri | null {
   return datastoreCache.getPreferredUri();
 }
+
+export type { OutboxEntry };
