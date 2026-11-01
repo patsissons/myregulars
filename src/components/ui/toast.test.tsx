@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { ToastProvider, useToast } from "./toast";
+import { ToastProvider, useOptionalToast, useToast, type ToastVariant } from "./toast";
 
-function Trigger({ message = "hi" }: { message?: string }) {
+function Trigger({ message = "hi", variant }: { message?: string; variant?: ToastVariant }) {
   const { showToast } = useToast();
   return (
-    <button type="button" onClick={() => showToast(message)}>
+    <button type="button" onClick={() => showToast(message, variant ? { variant } : undefined)}>
       show
     </button>
   );
@@ -53,6 +53,46 @@ describe("ToastProvider / useToast", () => {
       vi.advanceTimersByTime(2000);
     });
     expect(screen.queryByText("Bye")).toBeNull();
+  });
+
+  it("defaults to the success variant", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <Trigger message="Saved!" />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByText("show"));
+    expect(screen.getByRole("status").getAttribute("data-variant")).toBe("success");
+  });
+
+  it("renders an assertive error variant that stays longer", () => {
+    vi.useFakeTimers();
+    render(
+      <ToastProvider>
+        <Trigger message="Nope" variant="error" />
+      </ToastProvider>,
+    );
+    act(() => {
+      screen.getByText("show").click();
+    });
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("data-variant")).toBe("error");
+    expect(status.getAttribute("aria-live")).toBe("assertive");
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText("Nope")).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByText("Nope")).toBeNull();
+  });
+
+  it("useOptionalToast returns null outside a provider", () => {
+    const { result } = renderHook(() => useOptionalToast());
+    expect(result.current).toBeNull();
   });
 
   it("throws when useToast is used outside a provider", () => {

@@ -104,6 +104,20 @@ describe("datastore cache", () => {
     expect(cache.getPreferredUri()).toBe("gist:abc123");
   });
 
+  it("round-trips a hosted preferred URI", () => {
+    const cache = createDatastoreCache();
+    cache.setPreferredUri("hosted:rec123");
+
+    expect(cache.getPreferredUri()).toBe("hosted:rec123");
+  });
+
+  it("ignores a preferred URI with an unknown scheme", () => {
+    localStorage.setItem("myregulars:datastore-uri", "dropbox:abc");
+    const cache = createDatastoreCache();
+
+    expect(cache.getPreferredUri()).toBeNull();
+  });
+
   it("falls back to memory when indexedDB is unavailable", async () => {
     const cache = createDatastoreCache({
       indexedDB: undefined,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { PersonDetailPane } from "./person-detail-pane";
+import { localDateString } from "@/lib/datastore/helpers";
 import type { Group, Location, Person } from "@/lib/datastore/types";
 
 const mocks = vi.hoisted(() => ({
@@ -132,7 +133,28 @@ describe("PersonDetailPane", () => {
     await user.click(screen.getByRole("button", { name: "Log…" }));
     await user.click(screen.getByRole("button", { name: "Log visit" }));
 
-    expect(mocks.logVisit).toHaveBeenCalledWith("loc1", "g1", "p1", undefined);
+    expect(mocks.logVisit).toHaveBeenCalledWith("loc1", "g1", "p1", undefined, localDateString());
     expect(mocks.showToast).toHaveBeenCalledWith("Visit logged");
+  });
+
+  // Regression: the chosen date used to be discarded and "today" logged instead.
+  it("passes the chosen date and note through the Log… modal", async () => {
+    const user = userEvent.setup();
+    renderPane(makePerson());
+
+    await user.click(screen.getByRole("button", { name: "Log…" }));
+    const date = screen.getByLabelText("Date");
+    await user.clear(date);
+    await user.type(date, "2024-03-15");
+    await user.type(screen.getByLabelText("Note (optional)"), "Talked about hiking");
+    await user.click(screen.getByRole("button", { name: "Log visit" }));
+
+    expect(mocks.logVisit).toHaveBeenCalledWith(
+      "loc1",
+      "g1",
+      "p1",
+      "Talked about hiking",
+      "2024-03-15",
+    );
   });
 });
