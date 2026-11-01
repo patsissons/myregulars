@@ -102,7 +102,9 @@ export function createDatastoreCache(options: CacheOptions = {}): DatastoreCache
     },
     getPreferredUri() {
       const value = storage?.getItem(DATASTORE_PREFERENCE_KEY);
-      return value?.startsWith("gist:") ? (value as DatastoreUri) : null;
+      return value && (value.startsWith("gist:") || value.startsWith("hosted:"))
+        ? (value as DatastoreUri)
+        : null;
     },
   };
 }

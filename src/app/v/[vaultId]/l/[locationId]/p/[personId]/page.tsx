@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { PersonDetailPane } from "@/components/person-detail-pane";
 import { LocationDetailContent } from "@/components/location-detail-content";
+import { useLogVisitDialog } from "@/components/log-visit-dialog";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { useToast } from "@/components/ui/toast";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { findPerson, useVault } from "@/lib/vault-context";
 
@@ -20,10 +22,19 @@ export default function PersonPage({
   const { vaultId, locationId, personId } = use(params);
   const router = useRouter();
   const { vault, isReadOnly, logVisit } = useVault();
+  const { showToast } = useToast();
   const { openAdd, openEdit, DialogComponent } = usePersonFormDialog();
 
   const result = findPerson(vault, locationId, personId);
   const location = vault?.locations.find((l) => l.id === locationId);
+
+  // Hooks must run before the early return below; the dialog needs the ids
+  // only when invoked, by which point `result` is guaranteed.
+  const { openLogVisit, LogVisitDialogComponent } = useLogVisitDialog((day, note) => {
+    if (!result) return;
+    logVisit(locationId, result.group.id, personId, note, day);
+    showToast("Visit logged");
+  });
 
   if (!result || !location) {
     return (
@@ -144,11 +155,12 @@ export default function PersonPage({
                 fullWidth
                 onClick={() => {
                   logVisit(location.id, group.id, person.id);
+                  showToast("Visit logged");
                 }}
               >
                 Saw today
               </Button>
-              <Button variant="secondary" size="lg">
+              <Button variant="secondary" size="lg" onClick={openLogVisit}>
                 Log…
               </Button>
             </div>
@@ -218,6 +230,7 @@ export default function PersonPage({
       </div>
 
       {DialogComponent}
+      {LogVisitDialogComponent}
     </>
   );
 }

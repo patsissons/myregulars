@@ -46,6 +46,23 @@ export function hueFromString(s: string): number {
   return Math.abs(h) % 360;
 }
 
+/**
+ * The calendar date in the user's local timezone as `YYYY-MM-DD`.
+ * (`toISOString()` would give the UTC date, which is tomorrow for evening
+ * visits anywhere west of Greenwich.)
+ */
+export function localDateString(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Normalizes a `YYYY-MM-DD` day into the canonical visit timestamp. */
+export function toVisitTimestamp(day: string): string {
+  return `${day}T00:00:00.000Z`;
+}
+
 export function formatLastSeen(isoDate: string): string {
   const date = new Date(isoDate);
   const now = new Date();

@@ -1,15 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
+import { useLogVisitDialog } from "@/components/log-visit-dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
-import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
-import { Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getAllPeople, useVault } from "@/lib/vault-context";
@@ -36,25 +33,16 @@ export function PersonDetailPane({
   const { vault, isReadOnly, logVisit } = useVault();
   const { showToast } = useToast();
 
-  const [showLogModal, setShowLogModal] = useState(false);
-  const [logDate, setLogDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [logNote, setLogNote] = useState("");
+  const { openLogVisit, LogVisitDialogComponent } = useLogVisitDialog((day, note) => {
+    logVisit(location.id, group.id, person.id, note, day);
+    showToast("Visit logged");
+  });
 
   const allPeople = getAllPeople(vault);
 
   function handleSawToday() {
     logVisit(location.id, group.id, person.id);
     showToast("Visit logged");
-  }
-
-  function handleLog() {
-    const isoDate = `${logDate}T00:00:00.000Z`;
-    logVisit(location.id, group.id, person.id, logNote.trim() || undefined);
-    setShowLogModal(false);
-    setLogNote("");
-    setLogDate(new Date().toISOString().split("T")[0]);
-    showToast("Visit logged");
-    void isoDate; // date is used by logVisit as today's date; custom date is UX-only for now
   }
 
   const recentVisits = (person.visitLog ?? []).slice(0, 10);
@@ -120,7 +108,7 @@ export function PersonDetailPane({
           <Button variant="primary" size="md" fullWidth onClick={handleSawToday}>
             Saw today
           </Button>
-          <Button variant="secondary" size="md" onClick={() => setShowLogModal(true)}>
+          <Button variant="secondary" size="md" onClick={openLogVisit}>
             Log…
           </Button>
         </div>
@@ -215,46 +203,7 @@ export function PersonDetailPane({
         )}
       </div>
 
-      {/* Log modal */}
-      <Modal
-        open={showLogModal}
-        onOpenChange={(open) => {
-          setShowLogModal(open);
-          if (!open) {
-            setLogNote("");
-            setLogDate(new Date().toISOString().split("T")[0]);
-          }
-        }}
-        title="Log a visit"
-      >
-        <div className="flex flex-col gap-4 p-5">
-          <div>
-            <label className="mb-1 block text-[12px]" style={{ color: "var(--mr-dim)" }}>
-              Date
-            </label>
-            <Input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px]" style={{ color: "var(--mr-dim)" }}>
-              Note (optional)
-            </label>
-            <Textarea
-              placeholder="What did you chat about?"
-              value={logNote}
-              onChange={(e) => setLogNote(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowLogModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleLog}>
-              Log visit
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {LogVisitDialogComponent}
     </div>
   );
 }

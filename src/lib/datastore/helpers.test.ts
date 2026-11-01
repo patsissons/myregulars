@@ -8,6 +8,8 @@ import {
   formatLastSeen,
   generateId,
   hueFromString,
+  localDateString,
+  toVisitTimestamp,
 } from "@/lib/datastore/helpers";
 
 describe("generateId", () => {
@@ -134,5 +136,23 @@ describe("createLocation", () => {
   it("accepts optional description", () => {
     const location = createLocation("Daily Grind", "Tues/Thurs mornings");
     expect(location.description).toBe("Tues/Thurs mornings");
+  });
+});
+
+describe("localDateString", () => {
+  it("formats the local calendar day with zero padding", () => {
+    expect(localDateString(new Date(2026, 0, 5, 9, 30))).toBe("2026-01-05");
+  });
+
+  it("uses local time, not UTC", () => {
+    // 23:30 local; in UTC this may already be the next day.
+    const late = new Date(2026, 5, 27, 23, 30);
+    expect(localDateString(late)).toBe("2026-06-27");
+  });
+});
+
+describe("toVisitTimestamp", () => {
+  it("anchors a day at UTC midnight so existing visit dates stay comparable", () => {
+    expect(toVisitTimestamp("2026-06-27")).toBe("2026-06-27T00:00:00.000Z");
   });
 });

@@ -9,6 +9,7 @@ import {
   findPerson,
   getPeopleCount,
 } from "@/lib/vault-context";
+import { ToastProvider } from "@/components/ui/toast";
 import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
 import { getAuthenticatedUser } from "@/lib/github-user";
@@ -544,6 +545,8 @@ describe("person mutations", () => {
 
     expect(from?.people).toEqual([]);
     expect(to?.people.map((p) => p.id)).toEqual(["P2", "P1"]);
+    // The moved person is a changed entity; sync needs to see that.
+    expect(to?.people.find((p) => p.id === "P1")?.updatedAt).toBe(NOW);
   });
 
   it("movePerson is a no-op when the person is not in the source group", async () => {
@@ -596,6 +599,44 @@ describe("logVisit", () => {
       { date: "2026-06-20T00:00:00.000Z", note: "old" },
     ]);
   });
+
+  it("back-fills an older visit in date order without moving lastSeen backwards", async () => {
+    const doc = makeDocument([
+      makeLocation("L1", "Cafe", [
+        makeGroup("G1", "staff", [
+          makePerson("P1", "Alice", {
+            lastSeen: "2026-06-20T00:00:00.000Z",
+            visitLog: [{ date: "2026-06-20T00:00:00.000Z" }],
+          }),
+        ]),
+      ]),
+    ]);
+    const result = await renderLoaded(doc);
+    act(() => {
+      result.current.logVisit("L1", "G1", "P1", "trivia night", "2026-06-10");
+    });
+
+    const person = findPerson(result.current.vault, "L1", "P1")?.person;
+    expect(person?.lastSeen).toBe("2026-06-20T00:00:00.000Z");
+    expect(person?.visitLog).toEqual([
+      { date: "2026-06-20T00:00:00.000Z" },
+      { date: "2026-06-10T00:00:00.000Z", note: "trivia night" },
+    ]);
+  });
+
+  it("uses the local calendar day, not the UTC day", async () => {
+    // 23:30 local on the 27th is already the 28th in UTC for zones west of
+    // Greenwich; the visit must still be dated the 27th.
+    const lateEvening = new Date(2026, 5, 27, 23, 30);
+    vi.setSystemTime(lateEvening);
+    const result = await renderLoaded();
+    act(() => {
+      result.current.logVisit("L1", "G1", "P1");
+    });
+
+    const person = findPerson(result.current.vault, "L1", "P1")?.person;
+    expect(person?.lastSeen).toBe("2026-06-27T00:00:00.000Z");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -614,6 +655,22 @@ describe("updateVaultName", () => {
       name: string;
     }>;
     expect(known[0].name).toBe("Renamed Vault");
+  });
+
+  // Regression: renames were only persisted alongside the next other edit.
+  it("schedules a save with the new name", async () => {
+    const result = await renderLoaded();
+    vi.mocked(saveDatastore).mockResolvedValue(makeSnapshot(fixtureDocument(), { version: "v2" }));
+
+    act(() => {
+      result.current.updateVaultName("Renamed Vault");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(saveDatastore).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(saveDatastore).mock.calls[0][0].document.name).toBe("Renamed Vault");
   });
 });
 
@@ -679,6 +736,36 @@ describe("debounced sync", () => {
 
     expect(result.current.isSyncing).toBe(false);
     expect(result.current.error).toBe("Failed to save changes.");
+  });
+
+  // Regression: save failures were only stored in state, which the vault UI
+  // never displays once a vault is loaded.
+  it("shows an error toast when a save fails and a ToastProvider is present", async () => {
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({ login: "owner", id: 1, avatar_url: "" });
+    stubOwnerFetch("owner");
+    vi.mocked(loadDatastore).mockResolvedValue(makeSnapshot(fixtureDocument()));
+    vi.mocked(saveDatastore).mockRejectedValue(new Error("network down"));
+
+    const { result } = renderHook(() => useVault(), {
+      wrapper: ({ children }) => (
+        <ToastProvider>
+          <VaultProvider>{children}</VaultProvider>
+        </ToastProvider>
+      ),
+    });
+    await act(async () => {
+      await result.current.loadVault("abc");
+    });
+    act(() => {
+      result.current.addLocation("Diner");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    const status = document.querySelector('[role="status"]');
+    expect(status?.textContent).toContain("Couldn't save changes.");
+    expect(status?.getAttribute("data-variant")).toBe("error");
   });
 
   it("does not save when there is no auth token", async () => {
