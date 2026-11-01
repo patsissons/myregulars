@@ -2,9 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useOptionalToast } from "@/components/ui/toast";
-import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
+import {
+  createDatastore,
+  loadDatastore,
+  loadDatastoreVersion,
+  saveDatastore,
+  syncDatastoreReplicas,
+} from "@/lib/db";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
+import { findRegistryEntryByUri, siblingUriOf } from "@/lib/datastore/registry";
 import { createEmptyDocument } from "@/lib/datastore/schema";
+import { siblingProvider, siblingUriFromDocument } from "@/lib/datastore/sync";
 import {
   createGroup,
   createLocation,
@@ -108,6 +116,11 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const vaultRef = useRef<Vault | null>(null);
   const uriRef = useRef<DatastoreUri | null>(null);
   const versionRef = useRef<string | null>(null);
+  // The document as last read from or written to the datastore. Saves spread
+  // it so metadata (id, replica links, sync base) survives round trips.
+  const documentRef = useRef<MyRegularsDocument | null>(null);
+  // Bumped on every local mutation; lets async work tell "edited since I started".
+  const mutationSeqRef = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Toasts are optional so the provider also works without a ToastProvider.
@@ -140,8 +153,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       updateState({ isSyncing: true });
 
       try {
-        const document = {
-          ...createEmptyDocument(),
+        const document: MyRegularsDocument = {
+          ...(documentRef.current ?? createEmptyDocument()),
           name: vault.name,
           data: { locations: vault.locations },
         };
@@ -154,7 +167,17 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         });
 
         versionRef.current = snapshot.version;
+        documentRef.current = snapshot.document;
         updateState({ isSyncing: false, error: null });
+
+        if (snapshot.mirror.status === "pending") {
+          toastRef.current?.showToast(
+            snapshot.mirror.reason === "diverged"
+              ? "Your other copy has different changes. Open Storage to resolve."
+              : "Saved here, but couldn't update your other copy yet.",
+            { variant: "info" },
+          );
+        }
 
         // Update known vaults metadata
         const peopleCount = vault.locations.flatMap((l) =>
@@ -177,6 +200,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
             };
             vaultRef.current = newVault;
             versionRef.current = snapshot.version;
+            documentRef.current = snapshot.document;
             setState((prev) => ({ ...prev, vault: newVault, isSyncing: false }));
             toastRef.current?.showToast("This vault changed elsewhere. Loaded the latest copy.", {
               variant: "error",
@@ -199,63 +223,128 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     const current = vaultRef.current;
     if (!current) return;
     const updated: Vault = { ...current, locations: updater(current.locations) };
+    mutationSeqRef.current += 1;
     setVault(updated);
     scheduleSync();
   }
 
-  const loadVault = useCallback(async (uriInput: string) => {
-    updateState({ isLoading: true, error: null });
-    try {
-      const snapshot = await loadDatastore(uriInput);
-      const uri = snapshot.uri;
+  /**
+   * After opening a vault that has a copy in the other provider, bring the two
+   * back in line in the background. The sibling is fast-forwarded remotely;
+   * if this copy is the one that is behind, its content is adopted locally
+   * and flows through the normal save path, so a user who started editing in
+   * the meantime never has a remote write pulled out from under them.
+   */
+  const reconcileReplicas = useCallback(
+    (uri: DatastoreUri, document: MyRegularsDocument, writable: boolean) => {
+      const entry = findRegistryEntryByUri(uri);
+      const siblingUri =
+        (entry ? siblingUriOf(entry, uri) : null) ?? siblingUriFromDocument(document, uri);
+      if (!siblingUri) return;
 
-      // Read-only status and owner are resolved per provider.
-      const { ownerHandle, isReadOnly } = await resolveVaultOwnership(uri);
+      const seqAtStart = mutationSeqRef.current;
+      const self = getProviderFromUri(uri);
 
-      const existingVault = getKnownVaults().find((v) => v.uri === uri);
-      const nameFromFile = snapshot.vaultFileName
-        ? extractVaultNameFromFileName(snapshot.vaultFileName)
-        : null;
-      const nameFromDocument = snapshot.document.name;
-      const vault: Vault = {
-        name:
-          nameFromDocument ??
-          existingVault?.name ??
-          nameFromFile ??
-          `Vault ${getIdFromUri(uri).slice(0, 6)}`,
-        locations: snapshot.document.data.locations,
-      };
+      void syncDatastoreReplicas(uri, { applyTo: [siblingProvider(self)] })
+        .then((result) => {
+          if (uriRef.current !== uri) return;
+          if (result.status.kind !== "fastForward" || result.status.to !== self) return;
+          if (!writable || mutationSeqRef.current !== seqAtStart) return;
 
-      vaultRef.current = vault;
-      uriRef.current = uri;
-      versionRef.current = snapshot.version;
+          const current = vaultRef.current;
+          const incoming = result.sibling.document;
+          if (!current) return;
 
-      const peopleCount = vault.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length;
-      addKnownVault({
-        uri,
-        provider: getProviderFromUri(uri),
-        name: vault.name,
-        lastOpened: new Date().toISOString(),
-        peopleCount,
-        locationCount: vault.locations.length,
-      });
+          const adopted: Vault = {
+            name: incoming.name ?? current.name,
+            locations: incoming.data.locations,
+          };
+          documentRef.current = {
+            ...(documentRef.current ?? incoming),
+            name: adopted.name,
+            data: { locations: adopted.locations },
+          };
+          mutationSeqRef.current += 1;
+          setVault(adopted);
+          scheduleSync();
+          toastRef.current?.showToast("Updated from your other copy.", { variant: "info" });
+        })
+        .catch(() => {
+          // Offline, signed out of the other provider, etc. Nothing to do now;
+          // the next save retries the mirror.
+        });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scheduleSync],
+  );
 
-      updateState({
-        vault,
-        uri,
-        version: snapshot.version,
-        isReadOnly,
-        ownerHandle,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      updateState({
-        isLoading: false,
-        error: error instanceof Error ? error.message : "Failed to load vault.",
-      });
-    }
-  }, []);
+  const loadVault = useCallback(
+    async (uriInput: string) => {
+      updateState({ isLoading: true, error: null });
+      try {
+        const snapshot = await loadDatastore(uriInput);
+        const uri = snapshot.uri;
+
+        // Read-only status and owner are resolved per provider.
+        const { ownerHandle, isReadOnly } = await resolveVaultOwnership(uri, {
+          ownerId: snapshot.ownerId,
+        });
+
+        const existingVault = getKnownVaults().find((v) => v.uri === uri);
+        const nameFromFile = snapshot.vaultFileName
+          ? extractVaultNameFromFileName(snapshot.vaultFileName)
+          : null;
+        const nameFromDocument = snapshot.document.name;
+        const vault: Vault = {
+          name:
+            nameFromDocument ??
+            existingVault?.name ??
+            nameFromFile ??
+            `Vault ${getIdFromUri(uri).slice(0, 6)}`,
+          locations: snapshot.document.data.locations,
+        };
+
+        vaultRef.current = vault;
+        uriRef.current = uri;
+        versionRef.current = snapshot.version;
+        documentRef.current = snapshot.document;
+
+        const peopleCount = vault.locations.flatMap((l) =>
+          l.groups.flatMap((g) => g.people),
+        ).length;
+        addKnownVault({
+          id: snapshot.document.id,
+          uri,
+          provider: getProviderFromUri(uri),
+          name: vault.name,
+          lastOpened: new Date().toISOString(),
+          peopleCount,
+          locationCount: vault.locations.length,
+          replicas: snapshot.document.replicas,
+        });
+
+        updateState({
+          vault,
+          uri,
+          version: snapshot.version,
+          isReadOnly,
+          ownerHandle,
+          isLoading: false,
+          error: null,
+        });
+
+        if (snapshot.source === "remote") {
+          reconcileReplicas(uri, snapshot.document, !isReadOnly);
+        }
+      } catch (error) {
+        updateState({
+          isLoading: false,
+          error: error instanceof Error ? error.message : "Failed to load vault.",
+        });
+      }
+    },
+    [reconcileReplicas],
+  );
 
   const createVault = useCallback(
     async (name: string, provider: DatastoreProviderId = "gist"): Promise<DatastoreUri> => {
@@ -266,8 +355,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       vaultRef.current = vault;
       uriRef.current = uri;
       versionRef.current = snapshot.version;
+      documentRef.current = snapshot.document;
 
       addKnownVault({
+        id: snapshot.document.id,
         uri,
         provider: getProviderFromUri(uri),
         name,
@@ -288,10 +379,12 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       document: MyRegularsDocument,
       provider: DatastoreProviderId = "gist",
     ): Promise<DatastoreUri> => {
+      // An import is a brand-new vault: fresh id, no replica links or sync
+      // state carried over from wherever the JSON came from.
       const seed: MyRegularsDocument = {
-        ...document,
+        ...createEmptyDocument(),
         name,
-        updatedAt: new Date().toISOString(),
+        data: document.data,
       };
       const snapshot = await createDatastore(name, seed, provider);
       const uri = snapshot.uri;
@@ -303,9 +396,11 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       vaultRef.current = vault;
       uriRef.current = uri;
       versionRef.current = snapshot.version;
+      documentRef.current = snapshot.document;
 
       const peopleCount = vault.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length;
       addKnownVault({
+        id: snapshot.document.id,
         uri,
         provider: getProviderFromUri(uri),
         name,
@@ -588,9 +683,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     const snapshot = await createDatastore(name, undefined, provider);
     const newUri = snapshot.uri;
 
-    // Save the current vault's data into the new vault.
-    const document = {
-      ...createEmptyDocument(),
+    // Save the current vault's data into the new vault. A clone is its own
+    // vault (new id, no replica links), so spread the freshly created document.
+    const document: MyRegularsDocument = {
+      ...snapshot.document,
       name,
       data: { locations: currentVault.locations },
     };
@@ -607,6 +703,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     ).length;
 
     addKnownVault({
+      id: saved.document.id,
       uri: newUri,
       provider: getProviderFromUri(newUri),
       name,
@@ -620,6 +717,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     vaultRef.current = newVault;
     uriRef.current = newUri;
     versionRef.current = saved.version;
+    documentRef.current = saved.document;
 
     updateState({
       vault: newVault,
@@ -652,6 +750,9 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       vaultRef.current = vault;
       uriRef.current = uri;
       versionRef.current = latestSnapshot.version;
+      // Keep the latest copy's metadata so a revert writes a well-formed v2
+      // document with the right id and replica links.
+      documentRef.current = latestSnapshot.document;
 
       updateState({
         vault,
@@ -683,8 +784,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Cannot revert: missing vault data or authentication.");
     }
 
-    const document = {
-      ...createEmptyDocument(),
+    const document: MyRegularsDocument = {
+      ...(documentRef.current ?? createEmptyDocument()),
       name: currentVault.name,
       data: { locations: currentVault.locations },
     };
@@ -697,6 +798,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     });
 
     versionRef.current = saved.version;
+    documentRef.current = saved.document;
 
     updateState({
       version: saved.version,

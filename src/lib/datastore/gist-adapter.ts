@@ -19,6 +19,7 @@ import type {
   MyRegularsDocument,
   StorageAdapter,
   VersionInfo,
+  WriteOptions,
 } from "@/lib/datastore/types";
 
 interface GistFileResponse {
@@ -75,7 +76,10 @@ function requireAuthToken(authToken?: string | null): string {
   return authToken;
 }
 
-function readManagedFile(response: GistResponse): {
+function readManagedFile(
+  response: GistResponse,
+  uri?: DatastoreUri,
+): {
   document: MyRegularsDocument;
   fileName: string;
 } {
@@ -84,13 +88,20 @@ function readManagedFile(response: GistResponse): {
     ([name, file]) => DATASTORE_FILE_PATTERN.test(name) && file?.content,
   );
   if (patternEntry && patternEntry[1]?.content) {
-    return { document: parseDocumentString(patternEntry[1].content), fileName: patternEntry[0] };
+    const fileName = patternEntry[0];
+    return {
+      document: parseDocumentString(patternEntry[1].content, { uri, vaultFileName: fileName }),
+      fileName,
+    };
   }
 
   // Legacy fallback: myregulars.json
   const legacy = response.files[DATASTORE_FILE_NAME];
   if (legacy?.content) {
-    return { document: parseDocumentString(legacy.content), fileName: DATASTORE_FILE_NAME };
+    return {
+      document: parseDocumentString(legacy.content, { uri, vaultFileName: DATASTORE_FILE_NAME }),
+      fileName: DATASTORE_FILE_NAME,
+    };
   }
 
   throw new DatastoreValidationError(
@@ -117,7 +128,7 @@ function parseLinkNext(linkHeader: string | null): string | null {
   return match?.[1] ?? null;
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
+function assertOk(response: Response): void {
   if (response.status === 401) {
     clearGitHubAuthToken();
     throw new AuthRequiredError("GitHub authentication has expired. Please re-authenticate.");
@@ -126,7 +137,10 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(`GitHub Gist request failed with status ${response.status}.`);
   }
+}
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  assertOk(response);
   return (await response.json()) as T;
 }
 
@@ -174,7 +188,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     });
     const gist = await parseJsonResponse<GistResponse>(response);
     this.uri = normalizeDatastoreUri(gist.id);
-    const { document, fileName } = readManagedFile(gist);
+    const { document, fileName } = readManagedFile(gist, this.uri);
     this.detectedFileName = fileName;
     return {
       uri: this.getUri(),
@@ -185,7 +199,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
 
   async read(): Promise<{ data: MyRegularsDocument; version: string }> {
     const gist = await this.fetchGist();
-    const { document, fileName } = readManagedFile(gist);
+    const { document, fileName } = readManagedFile(gist, this.getUri());
     this.detectedFileName = fileName;
     return {
       data: document,
@@ -199,7 +213,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
       headers: buildHeaders(this.authToken),
     });
     const gist = await parseJsonResponse<GistResponse>(response);
-    const { document, fileName } = readManagedFile(gist);
+    const { document, fileName } = readManagedFile(gist, this.getUri());
     this.detectedFileName = fileName;
     return {
       data: document,
@@ -207,13 +221,16 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     };
   }
 
-  async write(data: MyRegularsDocument): Promise<string> {
+  // The Gist API has no conditional update, so `expectedVersion` is checked
+  // by the facade (read, compare, write) rather than here.
+  async write(data: MyRegularsDocument, options: WriteOptions = {}): Promise<string> {
     const gistId = this.getConnectedGistId();
     const authToken = requireAuthToken(this.authToken);
     const fileKey = this.detectedFileName ?? this.fileName;
     const response = await this.fetchImpl(`${GITHUB_GISTS_API_URL}/${gistId}`, {
       method: "PATCH",
       headers: buildHeaders(authToken),
+      keepalive: options.keepalive,
       body: JSON.stringify({
         files: {
           [fileKey]: {
@@ -224,6 +241,16 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
     });
     const gist = await parseJsonResponse<GistResponse>(response);
     return getLatestVersion(gist);
+  }
+
+  async delete(): Promise<void> {
+    const gistId = this.getConnectedGistId();
+    const authToken = requireAuthToken(this.authToken);
+    const response = await this.fetchImpl(`${GITHUB_GISTS_API_URL}/${gistId}`, {
+      method: "DELETE",
+      headers: buildHeaders(authToken),
+    });
+    assertOk(response);
   }
 
   async listVersions(): Promise<VersionInfo[]> {
@@ -293,7 +320,7 @@ export class GistStorageAdapter implements StorageAdapter<MyRegularsDocument> {
             headers: buildHeaders(authToken),
           });
           const gist = await parseJsonResponse<GistResponse>(response);
-          const { document } = readManagedFile(gist);
+          const { document } = readManagedFile(gist, formatDatastoreUri(candidate.id));
           documentName = document.name?.trim() || null;
         } catch {
           // Fall back to filename-derived name

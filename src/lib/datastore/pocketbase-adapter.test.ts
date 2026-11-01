@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type PocketBase from "pocketbase";
 
 import { PocketBaseStorageAdapter } from "@/lib/datastore/pocketbase-adapter";
-import { AuthRequiredError, DatastoreValidationError } from "@/lib/datastore/errors";
+import {
+  AuthRequiredError,
+  DatastoreConflictError,
+  DatastoreValidationError,
+} from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
 import type { MyRegularsDocument } from "@/lib/datastore/types";
 
@@ -11,6 +15,7 @@ function createService() {
     create: vi.fn(),
     getOne: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
     getFullList: vi.fn(),
   };
 }
@@ -36,7 +41,7 @@ function createFakeClient(options: { userId?: string | null; isValid?: boolean }
 }
 
 function namedDocument(name: string): MyRegularsDocument {
-  return { ...createEmptyDocument(new Date("2026-04-23T12:00:00.000Z")), name };
+  return createEmptyDocument(new Date("2026-04-23T12:00:00.000Z"), { id: "v1", name });
 }
 
 describe("PocketBaseStorageAdapter", () => {
@@ -44,9 +49,9 @@ describe("PocketBaseStorageAdapter", () => {
     vi.restoreAllMocks();
   });
 
-  it("creates a vault record plus an initial snapshot", async () => {
+  it("creates a vault record (snapshots are written server-side)", async () => {
     const { client, vaults, snapshots } = createFakeClient();
-    const document = createEmptyDocument(new Date("2026-04-23T12:00:00.000Z"));
+    const document = namedDocument("");
 
     vaults.create.mockResolvedValueOnce({
       id: "rec123",
@@ -56,7 +61,6 @@ describe("PocketBaseStorageAdapter", () => {
       created: "2026-04-23T12:00:00.000Z",
       updated: "2026-04-23T12:00:00.000Z",
     });
-    snapshots.create.mockResolvedValueOnce({ id: "snap1" });
 
     const adapter = new PocketBaseStorageAdapter({ client });
     const result = await adapter.create(document);
@@ -64,18 +68,20 @@ describe("PocketBaseStorageAdapter", () => {
     expect(result.uri).toBe("hosted:rec123");
     expect(result.version).toBe("2026-04-23T12:00:00.000Z");
     expect(vaults.create).toHaveBeenCalledWith({ owner: "user1", name: "", document });
-    expect(snapshots.create).toHaveBeenCalledWith({
-      vault: "rec123",
-      owner: "user1",
-      document,
-    });
+    expect(snapshots.create).not.toHaveBeenCalled();
+    expect(adapter.getOwnerId()).toBe("user1");
   });
 
   it("reads the current record and uses `updated` as the version", async () => {
     const { client, vaults } = createFakeClient();
     const document = createEmptyDocument();
 
-    vaults.getOne.mockResolvedValueOnce({ document, updated: "v-current" });
+    vaults.getOne.mockResolvedValueOnce({
+      owner: "u9",
+      public: true,
+      document,
+      updated: "v-current",
+    });
 
     const adapter = new PocketBaseStorageAdapter({ client });
     await adapter.connect("hosted:rec123");
@@ -84,26 +90,108 @@ describe("PocketBaseStorageAdapter", () => {
     expect(vaults.getOne).toHaveBeenCalledWith("rec123");
     expect(result.version).toBe("v-current");
     expect(result.data).toEqual(document);
+    expect(adapter.getOwnerId()).toBe("u9");
+    expect(adapter.isPublic()).toBe(true);
   });
 
-  it("writes the document and appends a snapshot", async () => {
-    const { client, vaults, snapshots } = createFakeClient();
-    const document = namedDocument("Home");
-
-    vaults.update.mockResolvedValueOnce({ updated: "v-next" });
-    snapshots.create.mockResolvedValueOnce({ id: "snap2" });
+  it("upgrades a legacy v1 record with an id derived from the record", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.getOne.mockResolvedValueOnce({
+      owner: "user1",
+      document: {
+        app: "myregulars",
+        schemaVersion: 1,
+        updatedAt: "2026-04-23T12:00:00.000Z",
+        data: { locations: [] },
+      },
+      updated: "v",
+    });
 
     const adapter = new PocketBaseStorageAdapter({ client });
     await adapter.connect("hosted:rec123");
-    const version = await adapter.write(document);
+    const result = await adapter.read();
+
+    expect(result.data.schemaVersion).toBe(2);
+    expect(result.data.id).toBe("hosted-rec123");
+  });
+
+  it("writes the document in one request, passing the expected version for the server check", async () => {
+    const { client, vaults, snapshots } = createFakeClient();
+    const document = namedDocument("Home");
+
+    vaults.update.mockResolvedValueOnce({ owner: "user1", updated: "v-next" });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+    const version = await adapter.write(document, { expectedVersion: "v-current" });
 
     expect(version).toBe("v-next");
-    expect(vaults.update).toHaveBeenCalledWith("rec123", { name: "Home", document });
-    expect(snapshots.create).toHaveBeenCalledWith({
-      vault: "rec123",
-      owner: "user1",
-      document,
-    });
+    expect(vaults.update).toHaveBeenCalledWith(
+      "rec123",
+      { name: "Home", document, expectedUpdated: "v-current" },
+      undefined,
+    );
+    expect(snapshots.create).not.toHaveBeenCalled();
+  });
+
+  it("omits expectedUpdated when no version is given and forwards keepalive", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.update.mockResolvedValueOnce({ updated: "v-next" });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+    await adapter.write(namedDocument("Home"), { keepalive: true });
+
+    expect(vaults.update).toHaveBeenCalledWith(
+      "rec123",
+      { name: "Home", document: expect.anything() },
+      { keepalive: true },
+    );
+  });
+
+  it("maps a 409 from the server hook to DatastoreConflictError", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.update.mockRejectedValueOnce({ status: 409, response: {} });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+
+    await expect(
+      adapter.write(namedDocument("Home"), { expectedVersion: "stale" }),
+    ).rejects.toThrow(DatastoreConflictError);
+  });
+
+  it("rethrows other write errors untouched", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.update.mockRejectedValueOnce({ status: 500, response: {} });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+
+    await expect(adapter.write(namedDocument("Home"))).rejects.toMatchObject({ status: 500 });
+  });
+
+  it("deletes the vault record", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.delete.mockResolvedValueOnce(true);
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+    await adapter.delete();
+
+    expect(vaults.delete).toHaveBeenCalledWith("rec123");
+  });
+
+  it("toggles public and returns the new version", async () => {
+    const { client, vaults } = createFakeClient();
+    vaults.update.mockResolvedValueOnce({ public: true, updated: "v-pub" });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+
+    await expect(adapter.setPublic(true)).resolves.toBe("v-pub");
+    expect(vaults.update).toHaveBeenCalledWith("rec123", { public: true });
+    expect(adapter.isPublic()).toBe(true);
   });
 
   it("lists snapshot versions newest-first", async () => {
@@ -124,19 +212,29 @@ describe("PocketBaseStorageAdapter", () => {
     ]);
   });
 
-  it("reads a historical version from a snapshot id", async () => {
+  it("reads a historical version and reports the vault token it was taken at", async () => {
     const { client, snapshots } = createFakeClient();
     const document = namedDocument("Old");
 
-    snapshots.getOne.mockResolvedValueOnce({ document });
+    snapshots.getOne.mockResolvedValueOnce({ document, vault_updated: "v-at-snapshot" });
 
     const adapter = new PocketBaseStorageAdapter({ client });
     await adapter.connect("hosted:rec123");
     const result = await adapter.readVersion("snap1");
 
     expect(snapshots.getOne).toHaveBeenCalledWith("snap1");
-    expect(result.version).toBe("snap1");
+    expect(result.version).toBe("v-at-snapshot");
     expect(result.data).toEqual(document);
+  });
+
+  it("falls back to the snapshot id for snapshots written before vault_updated existed", async () => {
+    const { client, snapshots } = createFakeClient();
+    snapshots.getOne.mockResolvedValueOnce({ document: namedDocument("Old") });
+
+    const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
+
+    expect((await adapter.readVersion("snap1")).version).toBe("snap1");
   });
 
   it("discovers the signed-in user's vaults", async () => {
@@ -164,11 +262,14 @@ describe("PocketBaseStorageAdapter", () => {
     ]);
   });
 
-  it("requires an authenticated user for create", async () => {
+  it("requires an authenticated user for create, write and delete", async () => {
     const { client } = createFakeClient({ userId: null });
     const adapter = new PocketBaseStorageAdapter({ client });
+    await adapter.connect("hosted:rec123");
 
     await expect(adapter.create(createEmptyDocument())).rejects.toThrow(AuthRequiredError);
+    await expect(adapter.write(createEmptyDocument())).rejects.toThrow(AuthRequiredError);
+    await expect(adapter.delete()).rejects.toThrow(AuthRequiredError);
   });
 
   it("throws before a uri is connected", () => {

@@ -74,6 +74,42 @@ describe("provider backfill", () => {
   });
 });
 
+describe("replica awareness", () => {
+  it("merges replica links carried on the document into the registry entry", () => {
+    addKnownVault({ ...vault1, id: "v-1", replicas: { hosted: { id: "rec1" } } });
+
+    const [known] = getKnownVaults();
+    expect(known?.id).toBe("v-1");
+    expect(known?.replicas).toEqual({ gist: { id: "abc123" }, hosted: { id: "rec1" } });
+    expect(getKnownVaults()).toHaveLength(1);
+  });
+
+  it("opening the other copy switches the primary uri but keeps one entry", () => {
+    addKnownVault({ ...vault1, id: "v-1", replicas: { hosted: { id: "rec1" } } });
+    addKnownVault({ ...vault1, id: "v-1", uri: "hosted:rec1", provider: "hosted" });
+
+    const vaults = getKnownVaults();
+    expect(vaults).toHaveLength(1);
+    expect(vaults[0]?.uri).toBe("hosted:rec1");
+    expect(vaults[0]?.replicas).toEqual({ gist: { id: "abc123" }, hosted: { id: "rec1" } });
+  });
+
+  it("removing one copy keeps the vault under its other copy", () => {
+    addKnownVault({ ...vault1, id: "v-1", replicas: { hosted: { id: "rec1" } } });
+    removeKnownVault("gist:abc123");
+
+    const vaults = getKnownVaults();
+    expect(vaults).toHaveLength(1);
+    expect(vaults[0]?.uri).toBe("hosted:rec1");
+    expect(vaults[0]?.provider).toBe("hosted");
+  });
+
+  it("assigns a legacy id to entries recorded without one", () => {
+    addKnownVault(vault1);
+    expect(getKnownVaults()[0]?.id).toBe("gist-abc123");
+  });
+});
+
 describe("removeKnownVault", () => {
   it("removes a vault by URI", () => {
     addKnownVault(vault1);

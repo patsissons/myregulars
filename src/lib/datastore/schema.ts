@@ -1,8 +1,20 @@
 import { z } from "zod";
 
-import { DATASTORE_APP_NAME, DATASTORE_SCHEMA_VERSION } from "@/lib/datastore/constants";
+import {
+  DATASTORE_APP_NAME,
+  DATASTORE_LEGACY_SCHEMA_VERSION,
+  DATASTORE_SCHEMA_VERSION,
+} from "@/lib/datastore/constants";
 import { DatastoreValidationError } from "@/lib/datastore/errors";
-import type { Group, Location, MyRegularsDocument, Person } from "@/lib/datastore/types";
+import { generateId } from "@/lib/datastore/helpers";
+import { upgradeDocument } from "@/lib/datastore/migrate";
+import type {
+  DocumentContext,
+  Group,
+  Location,
+  MyRegularsDocument,
+  Person,
+} from "@/lib/datastore/types";
 
 const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: "Expected a valid ISO-8601 timestamp.",
@@ -54,22 +66,61 @@ export const locationSchema = z.object({
   updatedAt: isoTimestampSchema,
 });
 
-export const myRegularsDocumentSchema = z.object({
+const vaultDataSchema = z
+  .object({
+    locations: z.array(locationSchema),
+  })
+  .strict();
+
+const replicaRefSchema = z.object({ id: z.string().min(1) });
+
+export const documentV1Schema = z.object({
   app: z.literal(DATASTORE_APP_NAME),
-  schemaVersion: z.literal(DATASTORE_SCHEMA_VERSION),
+  schemaVersion: z.literal(DATASTORE_LEGACY_SCHEMA_VERSION),
   name: z.string().optional(),
   updatedAt: isoTimestampSchema,
-  data: z
-    .object({
-      locations: z.array(locationSchema),
-    })
-    .strict(),
+  data: vaultDataSchema,
 });
 
-export function createEmptyDocument(now = new Date()): MyRegularsDocument {
+export const documentV2Schema = z.object({
+  app: z.literal(DATASTORE_APP_NAME),
+  schemaVersion: z.literal(DATASTORE_SCHEMA_VERSION),
+  id: z.string().min(1),
+  name: z.string().optional(),
+  updatedAt: isoTimestampSchema,
+  replicas: z
+    .object({
+      gist: replicaRefSchema.optional(),
+      hosted: replicaRefSchema.optional(),
+    })
+    .optional(),
+  sync: z
+    .object({
+      base: z.string().min(1),
+      at: isoTimestampSchema,
+    })
+    .optional(),
+  data: vaultDataSchema,
+});
+
+/** Accepts every schema version the app can read. */
+export const anyDocumentSchema = z.discriminatedUnion("schemaVersion", [
+  documentV1Schema,
+  documentV2Schema,
+]);
+
+/** @deprecated Use `documentV2Schema` (current) or `anyDocumentSchema` (reads). */
+export const myRegularsDocumentSchema = documentV2Schema;
+
+export function createEmptyDocument(
+  now = new Date(),
+  init: { id?: string; name?: string } = {},
+): MyRegularsDocument {
   return {
     app: DATASTORE_APP_NAME,
     schemaVersion: DATASTORE_SCHEMA_VERSION,
+    id: init.id ?? generateId(),
+    ...(init.name ? { name: init.name } : {}),
     updatedAt: now.toISOString(),
     data: {
       locations: [],
@@ -87,19 +138,26 @@ export function withUpdatedTimestamp(
   };
 }
 
-export function parseDocument(value: unknown): MyRegularsDocument {
-  const result = myRegularsDocumentSchema.safeParse(value);
+/**
+ * Validates a document of any supported schema version and returns it in the
+ * current shape. Pass the read context so legacy documents get a stable id.
+ */
+export function parseDocument(value: unknown, context?: DocumentContext): MyRegularsDocument {
+  const result = anyDocumentSchema.safeParse(value);
 
   if (!result.success) {
     throw new DatastoreValidationError(result.error.message);
   }
 
-  return result.data as MyRegularsDocument;
+  return upgradeDocument(result.data, context);
 }
 
-export function parseDocumentString(contents: string): MyRegularsDocument {
+export function parseDocumentString(
+  contents: string,
+  context?: DocumentContext,
+): MyRegularsDocument {
   try {
-    return parseDocument(JSON.parse(contents));
+    return parseDocument(JSON.parse(contents), context);
   } catch (error) {
     if (error instanceof DatastoreValidationError) {
       throw error;
@@ -109,6 +167,7 @@ export function parseDocumentString(contents: string): MyRegularsDocument {
   }
 }
 
+/** Serializes for storage. Always emits the current schema version. */
 export function serializeDocument(document: MyRegularsDocument): string {
   return JSON.stringify(parseDocument(document), null, 2);
 }
@@ -117,10 +176,12 @@ export function serializeDocument(document: MyRegularsDocument): string {
 export type ParsedPerson = z.infer<typeof personSchema>;
 export type ParsedGroup = z.infer<typeof groupSchema>;
 export type ParsedLocation = z.infer<typeof locationSchema>;
+export type ParsedDocumentV2 = z.infer<typeof documentV2Schema>;
 
 // Ensure zod inferred types match our interfaces
 type _PersonCheck = ParsedPerson extends Person ? true : false;
 type _GroupCheck = ParsedGroup extends Group ? true : false;
 type _LocationCheck = ParsedLocation extends Location ? true : false;
-const _: [_PersonCheck, _GroupCheck, _LocationCheck] = [true, true, true];
+type _DocumentCheck = ParsedDocumentV2 extends MyRegularsDocument ? true : false;
+const _: [_PersonCheck, _GroupCheck, _LocationCheck, _DocumentCheck] = [true, true, true, true];
 void _;
