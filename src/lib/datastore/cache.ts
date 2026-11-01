@@ -19,6 +19,7 @@ interface CacheOptions {
 export interface DatastoreCache {
   get(uri: DatastoreUri): Promise<DatastoreSnapshot | null>;
   set(snapshot: DatastoreSnapshot): Promise<void>;
+  remove(uri: DatastoreUri): Promise<void>;
   setPreferredUri(uri: DatastoreUri): void;
   getPreferredUri(): DatastoreUri | null;
 }
@@ -96,6 +97,27 @@ export function createDatastoreCache(options: CacheOptions = {}): DatastoreCache
       } satisfies DatastoreCacheRecord);
       await transactionToPromise(transaction);
       db.close();
+    },
+    async remove(uri) {
+      memoryFallback.delete(uri);
+
+      if (!indexedDBFactory) {
+        return;
+      }
+
+      try {
+        const db = await openDatabase(indexedDBFactory);
+        const transaction = db.transaction(DATASTORE_CACHE_STORE_NAME, "readwrite");
+        transaction.objectStore(DATASTORE_CACHE_STORE_NAME).delete(uri);
+        await transactionToPromise(transaction);
+        db.close();
+      } catch {
+        // Best effort: a stale cache entry is harmless.
+      }
+
+      if (storage?.getItem(DATASTORE_PREFERENCE_KEY) === uri) {
+        storage.removeItem(DATASTORE_PREFERENCE_KEY);
+      }
     },
     setPreferredUri(uri) {
       storage?.setItem(DATASTORE_PREFERENCE_KEY, uri);

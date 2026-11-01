@@ -19,6 +19,13 @@ export class DatastoreValidationError extends Error {
   }
 }
 
+export class DatastoreNotInSyncError extends Error {
+  constructor(message = "The copies of this vault differ. Sync them before removing one.") {
+    super(message);
+    this.name = "DatastoreNotInSyncError";
+  }
+}
+
 export class HostedNotConfiguredError extends Error {
   constructor(
     message = "Hosted vaults are not configured. Set NEXT_PUBLIC_POCKETBASE_URL to enable them.",

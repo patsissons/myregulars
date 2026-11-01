@@ -10,7 +10,14 @@ import {
   getPeopleCount,
 } from "@/lib/vault-context";
 import { ToastProvider } from "@/components/ui/toast";
-import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
+import {
+  createDatastore,
+  loadDatastore,
+  loadDatastoreVersion,
+  saveDatastore,
+  syncDatastoreReplicas,
+  type SaveResult,
+} from "@/lib/db";
 import { getGitHubAuthToken } from "@/lib/datastore/auth";
 import { getAuthenticatedUser } from "@/lib/github-user";
 import type {
@@ -31,6 +38,7 @@ vi.mock("@/lib/db", () => ({
   loadDatastore: vi.fn(),
   loadDatastoreVersion: vi.fn(),
   saveDatastore: vi.fn(),
+  syncDatastoreReplicas: vi.fn(),
 }));
 
 vi.mock("@/lib/datastore/auth", () => ({
@@ -79,26 +87,34 @@ function makeLocation(id: string, name: string, groups: Group[] = []): Location 
   };
 }
 
-function makeDocument(locations: Location[], name?: string): MyRegularsDocument {
+function makeDocument(
+  locations: Location[],
+  name?: string,
+  extra: Partial<MyRegularsDocument> = {},
+): MyRegularsDocument {
   return {
     app: "myregulars",
-    schemaVersion: 1,
+    schemaVersion: 2,
+    id: "vault-fixture",
     name,
     updatedAt: "2026-01-01T00:00:00.000Z",
     data: { locations },
+    ...extra,
   };
 }
 
+// Doubles as a SaveResult (superset of DatastoreSnapshot) for saveDatastore mocks.
 function makeSnapshot(
   document: MyRegularsDocument,
   overrides: Partial<DatastoreSnapshot> = {},
-): DatastoreSnapshot {
+): SaveResult {
   return {
     document,
     version: "v1",
     uri: "gist:abc",
     source: "remote",
     vaultFileName: "myregulars.test.json",
+    mirror: { status: "none" },
     ...overrides,
   };
 }
@@ -339,10 +355,13 @@ describe("loadVault", () => {
 
   it("records the vault in known-vaults on load", async () => {
     await renderLoaded();
-    const raw = localStorage.getItem("myregulars:known-vaults");
+    const raw = localStorage.getItem("myregulars:known-vaults@2");
     expect(raw).toBeTruthy();
-    const known = JSON.parse(raw ?? "[]") as Array<{ uri: string; peopleCount: number }>;
-    expect(known[0].uri).toBe("gist:abc");
+    const known = JSON.parse(raw ?? "[]") as Array<{
+      replicas: { gist?: { uri: string } };
+      peopleCount: number;
+    }>;
+    expect(known[0].replicas.gist?.uri).toBe("gist:abc");
     expect(known[0].peopleCount).toBe(2);
   });
 
@@ -651,7 +670,7 @@ describe("updateVaultName", () => {
     });
 
     expect(result.current.vault?.name).toBe("Renamed Vault");
-    const known = JSON.parse(localStorage.getItem("myregulars:known-vaults") ?? "[]") as Array<{
+    const known = JSON.parse(localStorage.getItem("myregulars:known-vaults@2") ?? "[]") as Array<{
       name: string;
     }>;
     expect(known[0].name).toBe("Renamed Vault");
@@ -780,6 +799,177 @@ describe("debounced sync", () => {
     });
 
     expect(saveDatastore).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Document metadata round-trips
+// ---------------------------------------------------------------------------
+
+describe("document metadata", () => {
+  it("spreads the loaded document on save so id, replica links and sync base survive", async () => {
+    const linked = makeDocument([makeLocation("L1", "Cafe")], "My Vault", {
+      id: "stable-id",
+      replicas: { hosted: { id: "rec1" } },
+      sync: { base: "h0", at: "2026-01-01T00:00:00.000Z" },
+    });
+    const result = await renderLoaded(linked);
+    vi.mocked(saveDatastore).mockResolvedValue(makeSnapshot(linked, { version: "v2" }));
+
+    act(() => {
+      result.current.addLocation("Diner");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    const saved = vi.mocked(saveDatastore).mock.calls[0][0].document;
+    expect(saved.id).toBe("stable-id");
+    expect(saved.replicas).toEqual({ hosted: { id: "rec1" } });
+    expect(saved.sync).toEqual({ base: "h0", at: "2026-01-01T00:00:00.000Z" });
+    expect(saved.data.locations).toHaveLength(2);
+  });
+
+  it("records the document id and replica links in known vaults on load", async () => {
+    await renderLoaded(
+      makeDocument([], "Linked", { id: "stable-id", replicas: { hosted: { id: "rec1" } } }),
+    );
+
+    const known = JSON.parse(localStorage.getItem("myregulars:known-vaults@2") ?? "[]") as Array<{
+      id: string;
+      replicas: Record<string, { uri: string }>;
+    }>;
+    expect(known[0].id).toBe("stable-id");
+    expect(known[0].replicas).toEqual({
+      gist: { uri: "gist:abc" },
+      hosted: { uri: "hosted:rec1" },
+    });
+  });
+
+  it("imports as a brand-new vault: fresh id, no replica links", async () => {
+    const pasted = makeDocument([makeLocation("L1", "Cafe")], "Theirs", {
+      id: "their-id",
+      replicas: { hosted: { id: "rec1" } },
+      sync: { base: "h", at: "2026-01-01T00:00:00.000Z" },
+    });
+    vi.mocked(createDatastore).mockImplementation(async (_name, seed) =>
+      makeSnapshot(seed!, { uri: "gist:new", version: "n1" }),
+    );
+    const { result } = renderVault();
+    await act(async () => {
+      await result.current.importVault("Mine", pasted);
+    });
+
+    const seed = vi.mocked(createDatastore).mock.calls[0][1]!;
+    expect(seed.id).not.toBe("their-id");
+    expect(seed.replicas).toBeUndefined();
+    expect(seed.sync).toBeUndefined();
+    expect(seed.name).toBe("Mine");
+    expect(seed.data.locations).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Replica reconciliation on open
+// ---------------------------------------------------------------------------
+
+describe("replica reconciliation on open", () => {
+  const linked = makeDocument([makeLocation("L1", "Cafe")], "Linked", {
+    id: "stable-id",
+    replicas: { hosted: { id: "rec1" } },
+  });
+  const newer = makeDocument([makeLocation("L1", "Cafe"), makeLocation("L9", "Gym")], "Linked", {
+    id: "stable-id",
+    replicas: { gist: { id: "abc" } },
+  });
+
+  function fastForwardToGist() {
+    return {
+      status: {
+        kind: "fastForward" as const,
+        from: "hosted" as const,
+        to: "gist" as const,
+        hash: "h",
+      },
+      applied: false,
+      primary: makeSnapshot(linked),
+      sibling: makeSnapshot(newer, { uri: "hosted:rec1", version: "pb-1" }),
+    };
+  }
+
+  it("is skipped for vaults without another copy", async () => {
+    await renderLoaded();
+    expect(syncDatastoreReplicas).not.toHaveBeenCalled();
+  });
+
+  it("only lets the background sync write the other copy, never this one", async () => {
+    vi.mocked(syncDatastoreReplicas).mockResolvedValue({
+      status: { kind: "inSync", hash: "h" },
+      applied: false,
+      primary: makeSnapshot(linked),
+      sibling: makeSnapshot(linked, { uri: "hosted:rec1" }),
+    });
+    await renderLoaded(linked);
+
+    expect(syncDatastoreReplicas).toHaveBeenCalledWith("gist:abc", { applyTo: ["hosted"] });
+  });
+
+  it("adopts the other copy's content locally when this copy is behind, then saves", async () => {
+    vi.mocked(syncDatastoreReplicas).mockResolvedValue(fastForwardToGist());
+    vi.mocked(saveDatastore).mockResolvedValue(makeSnapshot(newer, { version: "v2" }));
+
+    const result = await renderLoaded(linked);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.vault?.locations.map((l) => l.id)).toEqual(["L1", "L9"]);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    const saved = vi.mocked(saveDatastore).mock.calls[0][0];
+    expect(saved.expectedVersion).toBe("v1");
+    expect(saved.document.data.locations.map((l) => l.id)).toEqual(["L1", "L9"]);
+    expect(saved.document.id).toBe("stable-id");
+  });
+
+  it("does not clobber edits made while the comparison was in flight", async () => {
+    let resolveSync: (value: ReturnType<typeof fastForwardToGist>) => void = () => {};
+    vi.mocked(syncDatastoreReplicas).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSync = resolve;
+      }),
+    );
+
+    const result = await renderLoaded(linked);
+    act(() => {
+      result.current.addLocation("Diner");
+    });
+    await act(async () => {
+      resolveSync(fastForwardToGist());
+      await Promise.resolve();
+    });
+
+    expect(result.current.vault?.locations.map((l) => l.name)).toEqual(["Cafe", "Diner"]);
+  });
+
+  it("does not adopt into a read-only vault", async () => {
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({ login: "viewer", id: 2, avatar_url: "" });
+    stubOwnerFetch("owner");
+    vi.mocked(loadDatastore).mockResolvedValue(makeSnapshot(linked));
+    vi.mocked(syncDatastoreReplicas).mockResolvedValue(fastForwardToGist());
+
+    const { result } = renderVault();
+    await act(async () => {
+      await result.current.loadVault("abc");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.isReadOnly).toBe(true);
+    expect(result.current.vault?.locations.map((l) => l.id)).toEqual(["L1"]);
   });
 });
 

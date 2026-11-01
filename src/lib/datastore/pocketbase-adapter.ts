@@ -1,6 +1,10 @@
 import PocketBase from "pocketbase";
 
-import { AuthRequiredError, DatastoreValidationError } from "@/lib/datastore/errors";
+import {
+  AuthRequiredError,
+  DatastoreConflictError,
+  DatastoreValidationError,
+} from "@/lib/datastore/errors";
 import { getPocketBaseClient } from "@/lib/datastore/pocketbase-config";
 import { createEmptyDocument, parseDocument } from "@/lib/datastore/schema";
 import { formatHostedUri, getHostedIdFromUri, normalizeDatastoreUri } from "@/lib/datastore/uri";
@@ -10,6 +14,7 @@ import type {
   MyRegularsDocument,
   StorageAdapter,
   VersionInfo,
+  WriteOptions,
 } from "@/lib/datastore/types";
 
 export const VAULTS_COLLECTION = "vaults";
@@ -19,6 +24,7 @@ interface VaultRecord {
   id: string;
   owner: string;
   name?: string;
+  public?: boolean;
   document: unknown;
   created: string;
   updated: string;
@@ -29,6 +35,8 @@ interface SnapshotRecord {
   vault: string;
   owner: string;
   document: unknown;
+  /** The vault's `updated` token when this snapshot was taken (set by the server hook). */
+  vault_updated?: string;
   created: string;
 }
 
@@ -37,15 +45,26 @@ interface PocketBaseStorageAdapterOptions {
   client?: PocketBase;
 }
 
+function errorStatus(error: unknown): number | null {
+  if (typeof error === "object" && error !== null && "status" in error) {
+    const status = (error as { status: unknown }).status;
+    return typeof status === "number" ? status : null;
+  }
+  return null;
+}
+
 /**
  * Stores each vault as a record in the `vaults` collection of a PocketBase
  * instance. The record's `updated` autodate field is the optimistic-concurrency
- * version token; every write also appends a `vault_snapshots` row so history
- * (listVersions/readVersion) mirrors the gist provider.
+ * version token. Snapshots (`vault_snapshots`) are written server-side by
+ * `pocketbase/pb_hooks/vaults.pb.js` on every document change, so a save is a
+ * single request and history can never be left half-written.
  */
 export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocument> {
   private readonly injectedClient: PocketBase | null;
   private uri: DatastoreUri | null = null;
+  private lastOwnerId: string | null = null;
+  private lastPublic = false;
 
   constructor(options: PocketBaseStorageAdapterOptions = {}) {
     this.injectedClient = options.client ?? null;
@@ -69,11 +88,11 @@ export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocume
     });
 
     this.uri = formatHostedUri(record.id);
-    await this.appendSnapshot(client, record.id, ownerId, seed);
+    this.remember(record);
 
     return {
       uri: this.getUri(),
-      data: parseDocument(record.document),
+      data: parseDocument(record.document, { uri: this.uri }),
       version: record.updated,
     };
   }
@@ -83,9 +102,10 @@ export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocume
     const record = await client
       .collection<VaultRecord>(VAULTS_COLLECTION)
       .getOne(this.getRecordId());
+    this.remember(record);
 
     return {
-      data: parseDocument(record.document),
+      data: parseDocument(record.document, { uri: this.getUri() }),
       version: record.updated,
     };
   }
@@ -98,24 +118,61 @@ export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocume
       .getOne(version);
 
     return {
-      data: parseDocument(snapshot.document),
-      version,
+      data: parseDocument(snapshot.document, { uri: this.getUri() }),
+      version: snapshot.vault_updated || version,
     };
   }
 
-  async write(data: MyRegularsDocument): Promise<string> {
+  async write(data: MyRegularsDocument, options: WriteOptions = {}): Promise<string> {
     const client = this.getClient();
-    const ownerId = this.requireUserId(client);
+    this.requireUserId(client);
     const recordId = this.getRecordId();
 
-    const record = await client.collection<VaultRecord>(VAULTS_COLLECTION).update(recordId, {
-      name: data.name ?? "",
-      document: data,
-    });
+    try {
+      const record = await client.collection<VaultRecord>(VAULTS_COLLECTION).update(
+        recordId,
+        {
+          name: data.name ?? "",
+          document: data,
+          // Enforced by the server hook: rejected with 409 when the record's
+          // `updated` no longer matches.
+          ...(options.expectedVersion ? { expectedUpdated: options.expectedVersion } : {}),
+        },
+        options.keepalive ? { keepalive: true } : undefined,
+      );
+      this.remember(record);
+      return record.updated;
+    } catch (error) {
+      if (errorStatus(error) === 409) {
+        throw new DatastoreConflictError();
+      }
+      throw error;
+    }
+  }
 
-    await this.appendSnapshot(client, recordId, ownerId, data);
+  async delete(): Promise<void> {
+    const client = this.getClient();
+    this.requireUserId(client);
+    // Snapshots cascade with the vault record.
+    await client.collection<VaultRecord>(VAULTS_COLLECTION).delete(this.getRecordId());
+  }
 
+  async setPublic(flag: boolean): Promise<string> {
+    const client = this.getClient();
+    this.requireUserId(client);
+    const record = await client
+      .collection<VaultRecord>(VAULTS_COLLECTION)
+      .update(this.getRecordId(), { public: flag });
+    this.remember(record);
     return record.updated;
+  }
+
+  getOwnerId(): string | null {
+    return this.lastOwnerId;
+  }
+
+  isPublic(): boolean {
+    return this.lastPublic;
   }
 
   async listVersions(): Promise<VersionInfo[]> {
@@ -161,9 +218,16 @@ export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocume
     return this.uri;
   }
 
+  private remember(record: Partial<VaultRecord>): void {
+    if (typeof record.owner === "string") this.lastOwnerId = record.owner;
+    if (typeof record.public === "boolean") this.lastPublic = record.public;
+  }
+
   private resolveName(record: VaultRecord): string | null {
     try {
-      const documentName = parseDocument(record.document).name?.trim();
+      const documentName = parseDocument(record.document, {
+        uri: formatHostedUri(record.id),
+      }).name?.trim();
       if (documentName) {
         return documentName;
       }
@@ -172,19 +236,6 @@ export class PocketBaseStorageAdapter implements StorageAdapter<MyRegularsDocume
     }
 
     return record.name?.trim() || null;
-  }
-
-  private async appendSnapshot(
-    client: PocketBase,
-    vaultId: string,
-    ownerId: string,
-    document: MyRegularsDocument,
-  ): Promise<void> {
-    await client.collection<SnapshotRecord>(VAULT_SNAPSHOTS_COLLECTION).create({
-      vault: vaultId,
-      owner: ownerId,
-      document,
-    });
   }
 
   private getClient(): PocketBase {

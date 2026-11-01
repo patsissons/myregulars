@@ -10,7 +10,8 @@ function createSnapshot(): DatastoreSnapshot {
     source: "remote",
     document: {
       app: "myregulars",
-      schemaVersion: 1,
+      schemaVersion: 2,
+      id: "vault-1",
       updatedAt: "2026-04-23T12:00:00.000Z",
       data: {
         locations: [],
