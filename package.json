@@ -16,7 +16,11 @@
     "test:e2e": "playwright install chromium webkit && playwright test --pass-with-no-tests --reporter=list",
     "test:e2e:dev": "PLAYWRIGHT_DEV=1 npm run test:e2e",
     "validate": "npm run format:check && npm run typecheck && npm run lint && npm test",
-    "format-and-validate": "npm run format && npm run validate"
+    "format-and-validate": "npm run format && npm run validate",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:typegen": "wrangler types"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -25,7 +29,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.15.0",
     "lucide-react": "^0.510.0",
-    "next": "16.2.4",
+    "next": "^16.4.4",
     "pocketbase": "^0.27.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
@@ -34,6 +38,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.15",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -45,13 +50,14 @@
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^10.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "^16.4.4",
     "get-port": "^7.2.0",
     "happy-dom": "^20.9.0",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.0.0-insiders.f7d2598",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "wrangler": "^4.156.2"
   }
 }

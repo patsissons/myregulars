@@ -16,6 +16,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // PocketBase migrations run inside PocketBase's JSVM (custom globals).
     "pocketbase/**",
+    // Cloudflare: OpenNext build output, wrangler state, generated binding types.
+    ".open-next/**",
+    ".wrangler/**",
+    "cloudflare-env.d.ts",
   ]),
   {
     files: ["src/**/*.ts"],

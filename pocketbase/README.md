@@ -94,13 +94,20 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
 **redirect/callback URL** to your PocketBase instance's OAuth2 redirect:
 `<NEXT_PUBLIC_POCKETBASE_URL>/api/oauth2-redirect`.
 
-## Production (Vercel app + PocketHost instance)
+## Production (Cloudflare Worker + PocketHost instance)
 
 **On PocketHost (the PocketBase instance):**
 
 1. Create an instance; note its URL (e.g. `https://your-app.pockethost.io`).
 2. Deploy `pocketbase/pb_migrations` and `pocketbase/pb_hooks` to it (PocketHost supports both), so
-   the collections are created and the OAuth2 bootstrap hook runs.
+   the collections are created and the OAuth2 bootstrap hook runs. The
+   `.github/workflows/deploy-pocketbase.yml` workflow does this over FTP on every push to `main`
+   that touches those folders; it needs the `POCKETHOST_FTP_USER` / `POCKETHOST_FTP_PASSWORD`
+   secrets and the `POCKETHOST_INSTANCE` (instance subdomain) and `NEXT_PUBLIC_POCKETBASE_URL`
+   variables on the `production` environment. Hooks reload live; **migrations run on the next
+   start**, so power-cycle the instance from the PocketHost dashboard after a migration ships.
+   The first deploy of this repo's current migrations must happen **before** the web app that
+   relies on them (server-written snapshots, `vaults.public`).
 3. Set the OAuth2 secrets as **instance environment variables** — the hook reads them on boot:
    ```
    PB_OAUTH2_GITHUB_CLIENT_ID=...
@@ -109,13 +116,15 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
    ```
    (`PB_SUPERUSER_*` is not needed — PocketHost manages the admin account.)
 
-**On Vercel (the Next.js app):**
+**On Cloudflare (the Next.js app, as a Worker):**
 
-4. Set one env var and redeploy (it is inlined at build time):
+4. Set the build-time variable on the GitHub `production` environment and deploy (it is inlined
+   into the client bundle by `npm run cf:build`):
    ```
    NEXT_PUBLIC_POCKETBASE_URL=https://your-app.pockethost.io
    ```
    No trailing slash. The `PB_*` vars are **not** used by the web app — they belong on PocketHost.
+   See the root README's Deployment section for the Worker secrets.
 
 **OAuth app callback:** each production OAuth app's callback/redirect URL must be
 `https://your-app.pockethost.io/api/oauth2-redirect`. A classic GitHub OAuth app allows only one

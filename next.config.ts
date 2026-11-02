@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+// Lets `next dev` see Cloudflare bindings (via getCloudflareContext) the way
+// the deployed Worker does. No-op outside the dev server.
+void initOpenNextCloudflareForDev();
+
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

@@ -63,6 +63,42 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with your GitHub
 | `npm run format-and-validate` | Format, typecheck, lint, and test in one pass |
 | `npm test`                    | Run unit/component tests (Vitest)             |
 | `npm run test:e2e`            | Run end-to-end tests (Playwright)             |
+| `npm run cf:preview`          | Build and run the Cloudflare Worker locally   |
+| `npm run cf:deploy`           | Build and deploy the Cloudflare Worker        |
+
+## Deployment
+
+The app ships as a **Cloudflare Worker with static assets**, built by
+[`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). The hosted vault backend is a
+PocketBase instance on PocketHost (see `pocketbase/README.md`).
+
+| Command              | What it does                                                        |
+| -------------------- | ------------------------------------------------------------------- |
+| `npm run cf:build`   | `next build` + adapt to a Worker under `.open-next/`                |
+| `npm run cf:preview` | Build, then serve the Worker locally with `wrangler dev`            |
+| `npm run cf:deploy`  | Build and deploy with the Cloudflare credentials in your shell      |
+| `npm run cf:typegen` | Regenerate `cloudflare-env.d.ts` from `wrangler.jsonc` (gitignored) |
+
+**Automatic deploys.** `.github/workflows/deploy.yml` deploys `main` on every push. It needs, on
+the repository's `production` environment:
+
+- secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`;
+- secrets `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (the Gist OAuth app). The
+  workflow pushes them to the Worker as runtime secrets on each deploy;
+- variable `NEXT_PUBLIC_POCKETBASE_URL` (inlined into the client bundle at build time).
+
+`.github/workflows/deploy-pocketbase.yml` uploads `pocketbase/pb_migrations` and `pb_hooks` to
+PocketHost over FTP when they change; see `pocketbase/README.md` for its secrets and the
+power-cycle note.
+
+**Local preview.** Put the two `GITHUB_OAUTH_*` values in `.dev.vars` (gitignored) and run
+`npm run cf:preview`; the Worker serves on `http://localhost:8787`. The GitHub OAuth app's callback
+URL must match the origin you are testing (`<origin>/api/auth/github/callback`), so production
+uses its own OAuth app pointed at the Worker's domain.
+
+**Custom domain.** Attach `myregulars.app` to the Worker as a custom domain in the Cloudflare
+dashboard once its DNS is on Cloudflare; until then the `*.workers.dev` URL is the app's origin and
+must be the one registered on the GitHub OAuth app.
 
 ## Project structure
 
