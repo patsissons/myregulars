@@ -6,6 +6,11 @@ import { defineConfig, devices } from "@playwright/test";
 // hit a server that wasn't there. Use a fixed port, overridable via env.
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 31847);
 
+// Default to a production build: that is what users run, and `next dev`
+// compiles routes lazily, which produced spurious 404s mid-suite. Set
+// PLAYWRIGHT_DEV=1 to iterate against the dev server locally.
+const useDevServer = process.env.PLAYWRIGHT_DEV === "1";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -22,19 +27,24 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      // Pixel 5 uses the Chromium engine, so no extra browser download is needed.
-      // Engine-specific iOS behaviours (true dvh / keyboard resize) can't be
-      // exercised headless; those specs assert the structural CSS instead.
       name: "mobile",
       testMatch: /mobile\/.*\.spec\.ts$/,
       use: { ...devices["Pixel 5"] },
     },
+    {
+      // WebKit is the engine behind every iOS browser; most users are there.
+      name: "mobile-webkit",
+      testMatch: /mobile\/.*\.spec\.ts$/,
+      use: { ...devices["iPhone 13"] },
+    },
   ],
   webServer: {
-    command: `npx next dev -p ${port}`,
+    command: useDevServer
+      ? `npx next dev -p ${port}`
+      : `npx next build && npx next start -p ${port}`,
     url: `http://localhost:${port}`,
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 300_000,
     // Enable the hosted (PocketBase) provider UI. No PocketBase instance is
     // started; specs only exercise the client-side connect surface, and the
     // hosted discovery path no-ops without a signed-in account.

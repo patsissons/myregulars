@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Moon, MoreHorizontal, Plus, Sun } from "lucide-react";
+import { AppLink } from "@/components/app-link";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,26 +14,76 @@ import { ReadOnlyBanner } from "@/components/ui/read-only-banner";
 import { LogoMark } from "@/components/logo-mark";
 import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
-import { getVaultRoutePath } from "@/lib/datastore/uri";
-import { getAllPeople, VaultProvider, useVault } from "@/lib/vault-context";
+import { getAllPeople, useVault } from "@/lib/vault-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { useShareDialog } from "@/components/share-dialog";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
-import { LayoutTransition } from "@/components/layout-transition";
 import { VaultSearch } from "@/components/vault-search";
-import { VaultLoader } from "./vault-loader";
+import { navigate } from "@/lib/router/history";
+import { href, routes, type VaultScopedRoute } from "@/lib/router/routes";
+import { useIsMobile } from "@/lib/use-media";
 
 interface VaultShellProps {
-  vaultId: string;
+  route: VaultScopedRoute;
   children: React.ReactNode;
 }
 
-function VaultShell({ vaultId, children }: VaultShellProps) {
-  const router = useRouter();
-  const pathname = usePathname();
+/**
+ * Opens the vault named by the route and wraps the vault screens in the
+ * shared chrome: banners on every width, plus the top bar and sidebar on
+ * desktop. The store is cache-first, so only a first-ever open shows the
+ * loading state.
+ */
+export function VaultShell({ route, children }: VaultShellProps) {
+  const { vault, isLoading, error, openVault } = useVault();
+  const { uri, version } = route;
+
+  useEffect(() => {
+    void openVault(uri, version ? { version } : undefined);
+  }, [uri, version, openVault]);
+
+  if (!vault && error) {
+    return (
+      <div
+        className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center"
+        style={{ background: "var(--mr-bg)" }}
+      >
+        <p className="text-[14px]" style={{ color: "var(--mr-danger)" }}>
+          {error}
+        </p>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => void openVault(uri)}>
+            Retry
+          </Button>
+          <Button variant="secondary" onClick={() => navigate(routes.vaults(), { replace: true })}>
+            Your vaults
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!vault) {
+    return (
+      <div
+        className="flex min-h-dvh items-center justify-center"
+        style={{ background: "var(--mr-bg)" }}
+      >
+        <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
+          {isLoading ? "Loading vault…" : ""}
+        </span>
+      </div>
+    );
+  }
+
+  return <VaultChrome route={route}>{children}</VaultChrome>;
+}
+
+function VaultChrome({ route, children }: VaultShellProps) {
+  const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
   const {
     vault,
@@ -41,6 +91,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     isReadOnly,
     isHistoricalVersion,
     historicalVersionId,
+    source,
     addLocation,
     cloneVault,
     updateVaultName,
@@ -48,10 +99,11 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   } = useVault();
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
+  const { uri } = route;
 
   const { openShare, ShareDialogComponent } = useShareDialog();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
-  const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(vaultId);
+  const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(uri);
   const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
 
   const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
@@ -66,12 +118,9 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
-  // Parse active locationId from URL
-  const locationMatch = pathname.match(/\/v\/[^/]+\/l\/([^/]+)/);
-  const activeLocationId = locationMatch?.[1] ?? null;
+  const activeLocationId = route.kind === "vault" ? null : route.locationId;
 
-  // Sync label derived in render (no setState needed)
-  const syncLabel = isSyncing ? "syncing…" : "saved";
+  const syncLabel = isSyncing ? "syncing…" : source === "cache" ? "offline copy" : "saved";
 
   const filteredLocations = [...(vault?.locations ?? [])].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
@@ -111,10 +160,12 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     try {
       await revertToVersion();
       showToast("Reverted successfully");
-      globalThis.location.assign(`/v/${vaultId}`);
+      navigate(routes.vault(uri), { replace: true, transition: "none" });
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to revert.");
+      showToast(err instanceof Error ? err.message : "Failed to revert.", { variant: "error" });
+    } finally {
       setIsReverting(false);
+      setShowRevertModal(false);
     }
   }
 
@@ -125,7 +176,8 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     try {
       const newUri = await cloneVault(cloneName.trim());
       showToast("Vault cloned!");
-      router.push(getVaultRoutePath(newUri));
+      setShowCloneModal(false);
+      navigate(routes.vault(newUri));
     } catch (err) {
       setCloneError(err instanceof Error ? err.message : "Failed to clone vault.");
     } finally {
@@ -133,100 +185,12 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
     }
   }
 
-  return (
-    <div
-      className="flex min-h-dvh flex-col"
-      style={{
-        background: "var(--mr-bg)",
-        ...(isHistoricalVersion ? { boxShadow: "inset 0 0 0 3px var(--mr-accent)" } : undefined),
-      }}
-    >
-      {/* Top bar — desktop only */}
-      <div
-        className="hidden shrink-0 items-center gap-2 lg:flex"
-        style={{
-          height: 46,
-          padding: "0 16px",
-          borderBottom: "1px solid var(--mr-edge)",
-          background: "var(--mr-panel)",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => router.push(`/v/${vaultId}`)}
-          className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
-          aria-label="Vault overview"
-        >
-          <LogoMark size={26} />
-          <span
-            className="truncate text-[13px] font-[500]"
-            style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
-          >
-            {vault?.name ?? "Vault"}
-          </span>
-          <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
-            · {syncLabel}
-          </span>
-        </button>
-
-        {/* Right actions */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={openShare}
-            className="flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[12px] font-[500] transition-all hover:border-black/50! hover:brightness-[0.92] dark:hover:brightness-[1.1]"
-            style={{
-              background: "var(--mr-subtle)",
-              border: "1px solid var(--mr-edge)",
-              color: "var(--mr-text)",
-            }}
-          >
-            Share
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-          >
-            {theme === "dark" ? (
-              <Sun size={15} style={{ color: "var(--mr-dim)" }} />
-            ) : (
-              <Moon size={15} style={{ color: "var(--mr-dim)" }} />
-            )}
-          </button>
-
-          <DropdownMenu
-            items={[
-              {
-                label: "Rename vault",
-                onClick: () => {
-                  setRenameValue(vault?.name ?? "");
-                  setShowRenameModal(true);
-                },
-              },
-              { label: "View vault data", onClick: openVaultData },
-              { label: "Version history", onClick: openVersionHistory },
-              { label: "Close vault", onClick: () => router.push("/vaults") },
-            ]}
-            trigger={
-              <button
-                type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-                aria-label="More options"
-              >
-                <MoreHorizontal size={15} style={{ color: "var(--mr-dim)" }} />
-              </button>
-            }
-          />
-        </div>
-      </div>
-
+  const banners = (
+    <>
       {/* Historical version banner */}
       {isHistoricalVersion && historicalVersionId && (
         <div
-          className="flex items-center justify-between px-4 py-2"
+          className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
           style={{
             background: "var(--mr-accent-soft)",
             borderBottom: "1px solid var(--mr-accent-soft-border)",
@@ -236,8 +200,9 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
             Viewing version {historicalVersionId.slice(0, 7)}
           </span>
           <div className="flex items-center gap-2">
-            <a
-              href={`/v/${vaultId}`}
+            <AppLink
+              route={routes.vault(uri)}
+              replace
               className="inline-flex h-[30px] items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-[500] no-underline transition-all hover:brightness-[0.92] dark:hover:brightness-[1.1]"
               style={{
                 background: "var(--mr-subtle)",
@@ -246,7 +211,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
               }}
             >
               Back to latest
-            </a>
+            </AppLink>
             <Button variant="primary" size="sm" onClick={() => setShowRevertModal(true)}>
               Revert to this version
             </Button>
@@ -259,8 +224,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
         <ReadOnlyBanner
           onClone={() => {
             if (!isAuthenticated) {
-              const returnTo = encodeURIComponent(window.location.href);
-              router.push(`/connect?returnTo=${returnTo}`);
+              navigate(routes.connect(href(route)));
               return;
             }
             const baseName = vault?.name ?? "Vault";
@@ -269,95 +233,11 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
           }}
         />
       )}
+    </>
+  );
 
-      {/* Body: sidebar + content */}
-      <div className="flex min-h-0 flex-1">
-        {/* Left sidebar — desktop only */}
-        <div
-          className="hidden w-[268px] shrink-0 flex-col overflow-y-auto lg:flex"
-          style={{
-            borderRight: "1px solid var(--mr-edge)",
-            background: "var(--mr-panel)",
-          }}
-        >
-          {/* Search */}
-          <div className="px-3 pt-3 pb-2">
-            <VaultSearch vaultId={vaultId} />
-          </div>
-
-          {/* PLACES */}
-          <div className="px-3 pt-2 pb-1">
-            <Eyebrow className="block px-[7px]">Places</Eyebrow>
-          </div>
-          <div className="flex flex-col gap-[2px] px-3">
-            {filteredLocations.map((location) => (
-              <LocationRow
-                key={location.id}
-                location={{
-                  name: location.name,
-                  description: location.description,
-                  peopleCount: getPeopleCount(location.id),
-                }}
-                active={location.id === activeLocationId}
-                onClick={() => router.push(`/v/${vaultId}/l/${location.id}`)}
-              />
-            ))}
-          </div>
-
-          {/* + New place */}
-          {!isReadOnly && (
-            <div className="px-3 pt-1 pb-2">
-              <button
-                type="button"
-                onClick={() => setShowNewPlaceModal(true)}
-                className="flex w-full items-center gap-1.5 rounded-[7px] px-[7px] py-[7px] text-left text-[13px] transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-                style={{ color: "var(--mr-dim)" }}
-              >
-                <Plus size={13} style={{ flexShrink: 0 }} />
-                New place
-              </button>
-            </div>
-          )}
-
-          {/* RECENT PEOPLE */}
-          {recentPeople.length > 0 && (
-            <>
-              <div className="px-3 pt-3 pb-1">
-                <Eyebrow className="block px-[7px]">Recent people</Eyebrow>
-              </div>
-              <div className="flex flex-col gap-[2px] px-3 pb-3">
-                {recentPeople.map(({ person, location }) => (
-                  <button
-                    key={person.id}
-                    type="button"
-                    onClick={() => router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)}
-                    className="flex w-full items-center gap-2 rounded-[7px] px-[7px] py-[5px] text-left transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-                  >
-                    <Avatar name={person.name} size={20} photoUrl={person.photoUrl} />
-                    <span
-                      className="min-w-0 flex-1 truncate text-[13px]"
-                      style={{ color: "var(--mr-text)" }}
-                    >
-                      {person.name}
-                    </span>
-                    {person.lastSeen && (
-                      <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
-                        {formatLastSeen(person.lastSeen)}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Center + right rail */}
-        <div className="flex min-w-0 flex-1">
-          <LayoutTransition className="min-w-0 flex-1 overflow-y-auto">{children}</LayoutTransition>
-        </div>
-      </div>
-
+  const dialogs = (
+    <>
       {/* New Place Modal */}
       <Modal
         open={showNewPlaceModal}
@@ -437,7 +317,7 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
       >
         <div className="flex flex-col gap-4 p-5">
           <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-            A copy of this vault will be saved to your GitHub Gists.
+            A copy of this vault will be saved to your own storage.
           </p>
           <Input
             placeholder="Vault name"
@@ -495,24 +375,207 @@ function VaultShell({ vaultId, children }: VaultShellProps) {
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
       {DuplicateConfirmDialogComponent}
-    </div>
+    </>
   );
-}
 
-export default function VaultLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ vaultId: string }>;
-}) {
-  const { vaultId } = use(params);
+  if (isMobile) {
+    return (
+      <div
+        className="flex min-h-dvh flex-col"
+        style={{
+          background: "var(--mr-bg)",
+          ...(isHistoricalVersion ? { boxShadow: "inset 0 0 0 3px var(--mr-accent)" } : undefined),
+        }}
+      >
+        {banners}
+        {children}
+        {dialogs}
+      </div>
+    );
+  }
 
   return (
-    <VaultProvider>
-      <VaultLoader vaultId={vaultId}>
-        <VaultShell vaultId={vaultId}>{children}</VaultShell>
-      </VaultLoader>
-    </VaultProvider>
+    <div
+      className="flex h-dvh flex-col"
+      style={{
+        background: "var(--mr-bg)",
+        ...(isHistoricalVersion ? { boxShadow: "inset 0 0 0 3px var(--mr-accent)" } : undefined),
+      }}
+    >
+      {/* Top bar */}
+      <div
+        className="flex shrink-0 items-center gap-2"
+        style={{
+          height: 46,
+          padding: "0 16px",
+          borderBottom: "1px solid var(--mr-edge)",
+          background: "var(--mr-panel)",
+        }}
+      >
+        <AppLink
+          route={routes.vault(uri)}
+          className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 no-underline transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+          aria-label="Vault overview"
+        >
+          <LogoMark size={26} />
+          <span
+            className="truncate text-[13px] font-[500]"
+            style={{ color: "var(--mr-text)", letterSpacing: "-0.01em" }}
+          >
+            {vault?.name ?? "Vault"}
+          </span>
+          <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
+            · {syncLabel}
+          </span>
+        </AppLink>
+
+        {/* Right actions */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={openShare}
+            className="flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[12px] font-[500] transition-all hover:border-black/50! hover:brightness-[0.92] dark:hover:brightness-[1.1]"
+            style={{
+              background: "var(--mr-subtle)",
+              border: "1px solid var(--mr-edge)",
+              color: "var(--mr-text)",
+            }}
+          >
+            Share
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          >
+            {theme === "dark" ? (
+              <Sun size={15} style={{ color: "var(--mr-dim)" }} />
+            ) : (
+              <Moon size={15} style={{ color: "var(--mr-dim)" }} />
+            )}
+          </button>
+
+          <DropdownMenu
+            items={[
+              {
+                label: "Rename vault",
+                onClick: () => {
+                  setRenameValue(vault?.name ?? "");
+                  setShowRenameModal(true);
+                },
+              },
+              { label: "View vault data", onClick: openVaultData },
+              { label: "Version history", onClick: openVersionHistory },
+              { label: "Close vault", onClick: () => navigate(routes.vaults()) },
+            ]}
+            trigger={
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={15} style={{ color: "var(--mr-dim)" }} />
+              </button>
+            }
+          />
+        </div>
+      </div>
+
+      {banners}
+
+      {/* Body: sidebar + content */}
+      <div className="flex min-h-0 flex-1">
+        {/* Left sidebar */}
+        <div
+          className="flex w-[268px] shrink-0 flex-col overflow-y-auto"
+          style={{
+            borderRight: "1px solid var(--mr-edge)",
+            background: "var(--mr-panel)",
+          }}
+        >
+          {/* Search */}
+          <div className="px-3 pt-3 pb-2">
+            <VaultSearch uri={uri} />
+          </div>
+
+          {/* PLACES */}
+          <div className="px-3 pt-2 pb-1">
+            <Eyebrow className="block px-[7px]">Places</Eyebrow>
+          </div>
+          <div className="flex flex-col gap-[2px] px-3">
+            {filteredLocations.map((location) => (
+              <LocationRow
+                key={location.id}
+                location={{
+                  name: location.name,
+                  description: location.description,
+                  peopleCount: getPeopleCount(location.id),
+                }}
+                active={location.id === activeLocationId}
+                onClick={() => navigate(routes.location(uri, location.id))}
+              />
+            ))}
+          </div>
+
+          {/* + New place */}
+          {!isReadOnly && (
+            <div className="px-3 pt-1 pb-2">
+              <button
+                type="button"
+                onClick={() => setShowNewPlaceModal(true)}
+                className="flex w-full items-center gap-1.5 rounded-[7px] px-[7px] py-[7px] text-left text-[13px] transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                style={{ color: "var(--mr-dim)" }}
+              >
+                <Plus size={13} style={{ flexShrink: 0 }} />
+                New place
+              </button>
+            </div>
+          )}
+
+          {/* RECENT PEOPLE */}
+          {recentPeople.length > 0 && (
+            <>
+              <div className="px-3 pt-3 pb-1">
+                <Eyebrow className="block px-[7px]">Recent people</Eyebrow>
+              </div>
+              <div className="flex flex-col gap-[2px] px-3 pb-3">
+                {recentPeople.map(({ person, location }) => (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => navigate(routes.person(uri, location.id, person.id))}
+                    className="flex w-full items-center gap-2 rounded-[7px] px-[7px] py-[5px] text-left transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
+                  >
+                    <Avatar name={person.name} size={20} photoUrl={person.photoUrl} />
+                    <span
+                      className="min-w-0 flex-1 truncate text-[13px]"
+                      style={{ color: "var(--mr-text)" }}
+                    >
+                      {person.name}
+                    </span>
+                    {person.lastSeen && (
+                      <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
+                        {formatLastSeen(person.lastSeen)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Center + right rail. data-scroll-region: the router restores this pane's scroll. */}
+        <div className="flex min-w-0 flex-1">
+          <div data-scroll-region className="min-w-0 flex-1 overflow-y-auto">
+            {children}
+          </div>
+        </div>
+      </div>
+
+      {dialogs}
+    </div>
   );
 }

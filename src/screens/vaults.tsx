@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { Server, X } from "lucide-react";
 import { GitHubMark } from "@/components/icons/github-mark";
 import { LogoMark } from "@/components/logo-mark";
@@ -12,23 +11,19 @@ import { Modal } from "@/components/ui/modal";
 import { VaultCard, NewVaultCard, ImportVaultCard } from "@/components/vault-card";
 import { HostedAuthButtons } from "@/components/hosted-auth-buttons";
 import { useAuth } from "@/lib/auth-context";
-import { VaultProvider, useVault } from "@/lib/vault-context";
+import { useVault } from "@/lib/vault-context";
 import { discoverDatastores } from "@/lib/db";
 import { isHostedConfigured } from "@/lib/datastore/pocketbase-config";
 import { addKnownVault, getKnownVaults, removeKnownVault } from "@/lib/known-vaults";
-import {
-  getIdFromUri,
-  getProviderFromUri,
-  getVaultRoutePath,
-  normalizeDatastoreUri,
-} from "@/lib/datastore/uri";
+import { getIdFromUri, getProviderFromUri, normalizeDatastoreUri } from "@/lib/datastore/uri";
 import { parseDocumentString } from "@/lib/datastore/schema";
+import { navigate } from "@/lib/router/history";
+import { routes } from "@/lib/router/routes";
 import type { DatastoreProviderId, DatastoreUri, MyRegularsDocument } from "@/lib/datastore/types";
 import type { KnownVault } from "@/lib/vault-types";
 import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 
 function VaultsContent() {
-  const router = useRouter();
   const { username, isAuthenticated, hosted, logout, logoutHosted } = useAuth();
   const { createVault, importVault } = useVault();
   const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
@@ -50,14 +45,12 @@ function VaultsContent() {
     : (providerOptions[0]?.id ?? "gist");
   // Hosted vault chosen but not signed in yet — the modal shows sign-in first.
   const needsHostedLogin = effectiveProvider === "hosted" && !hostedAvailable;
-  // Read from localStorage in lazy initializer (client-only component)
-  const [vaults, setVaults] = useState<KnownVault[]>(() =>
-    typeof localStorage !== "undefined" ? getKnownVaults() : [],
-  );
+  const [vaults, setVaults] = useState<KnownVault[]>(() => getKnownVaults());
   const [isDiscovering, setIsDiscovering] = useState(true);
   const [showNewVaultModal, setShowNewVaultModal] = useState(false);
   const [newVaultName, setNewVaultName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [linkError, setLinkError] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
@@ -67,14 +60,11 @@ function VaultsContent() {
   const [importError, setImportError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [navigatingUri, setNavigatingUri] = useState<DatastoreUri | null>(null);
-  const [, startNavigation] = useTransition();
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
   function handleOpenVault(uri: DatastoreUri) {
     setNavigatingUri(uri);
-    startNavigation(() => {
-      router.push(getVaultRoutePath(uri));
-    });
+    navigate(routes.vault(uri));
   }
 
   useEffect(() => {
@@ -129,12 +119,13 @@ function VaultsContent() {
     const confirmed = await checkDuplicate("vault", newVaultName.trim(), existingNames);
     if (!confirmed) return;
     setIsCreating(true);
+    setCreateError("");
     try {
       const uri = await createVault(newVaultName.trim(), effectiveProvider);
       setShowNewVaultModal(false);
-      router.push(getVaultRoutePath(uri));
+      navigate(routes.vault(uri));
     } catch (err) {
-      console.error("Failed to create vault:", err);
+      setCreateError(err instanceof Error ? err.message : "Failed to create vault.");
     } finally {
       setIsCreating(false);
     }
@@ -203,9 +194,8 @@ function VaultsContent() {
       const uri = await importVault(trimmedName, importedDoc, effectiveProvider);
       setShowImportModal(false);
       resetImportState();
-      router.push(getVaultRoutePath(uri));
+      navigate(routes.vault(uri));
     } catch (err) {
-      console.error("Failed to import vault:", err);
       setImportError(err instanceof Error ? err.message : "Failed to import vault.");
       setIsImporting(false);
     }
@@ -218,7 +208,7 @@ function VaultsContent() {
     }
     try {
       const uri = normalizeDatastoreUri(linkInput.trim());
-      router.push(getVaultRoutePath(uri));
+      navigate(routes.vault(uri));
     } catch {
       setLinkError("Invalid vault link. Try a gist ID or share URL.");
     }
@@ -226,10 +216,10 @@ function VaultsContent() {
 
   return (
     <div
-      className="flex min-h-screen flex-col"
+      className="safe-x flex min-h-dvh flex-col"
       style={{ background: "var(--mr-bg)", color: "var(--mr-text)" }}
     >
-      <div className="mx-auto w-full max-w-[720px] px-5 py-8">
+      <div className="safe-top safe-bottom mx-auto w-full max-w-[720px] px-5 py-8">
         {/* Header */}
         <div className="mb-2 flex items-center gap-3">
           <LogoMark size={32} />
@@ -357,7 +347,10 @@ function VaultsContent() {
         open={showNewVaultModal}
         onOpenChange={(open) => {
           setShowNewVaultModal(open);
-          if (!open) setNewVaultName("");
+          if (!open) {
+            setNewVaultName("");
+            setCreateError("");
+          }
         }}
         title="New vault"
       >
@@ -404,6 +397,11 @@ function VaultsContent() {
                 onKeyDown={(e) => e.key === "Enter" && !isCreating && handleCreateVault()}
                 autoFocus
               />
+              {createError && (
+                <p className="text-[12px]" style={{ color: "var(--mr-danger)" }}>
+                  {createError}
+                </p>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
                   Cancel
@@ -454,7 +452,7 @@ function VaultsContent() {
               </span>
             </div>
             <Textarea
-              placeholder='{ "app": "myregulars", "schemaVersion": 1, ... }'
+              placeholder='{ "app": "myregulars", "schemaVersion": 2, ... }'
               value={importJson}
               onChange={(e) => tryParseImport(e.target.value)}
               rows={8}
@@ -515,21 +513,20 @@ function VaultsContent() {
   );
 }
 
-export default function VaultsPage() {
-  const router = useRouter();
+export function VaultsScreen() {
   const { isAuthenticated, isLoading, hosted } = useAuth();
   const authed = isAuthenticated || hosted.isAuthenticated;
 
   useEffect(() => {
     if (!isLoading && !authed) {
-      router.replace("/");
+      navigate(routes.landing(), { replace: true, transition: "none" });
     }
-  }, [authed, isLoading, router]);
+  }, [authed, isLoading]);
 
   if (isLoading || !authed) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex min-h-dvh items-center justify-center"
         style={{ background: "var(--mr-bg)" }}
       >
         <div className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
@@ -539,9 +536,5 @@ export default function VaultsPage() {
     );
   }
 
-  return (
-    <VaultProvider>
-      <VaultsContent />
-    </VaultProvider>
-  );
+  return <VaultsContent />;
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ChevronLeft, MoreHorizontal, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -15,17 +14,75 @@ import { EmptyState } from "@/components/empty-state";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useVault } from "@/lib/vault-context";
+import { goBack, navigate } from "@/lib/router/history";
+import { routes, type Route } from "@/lib/router/routes";
+import { useIsMobile } from "@/lib/use-media";
 
-export default function LocationPage({
-  params,
-}: {
-  params: Promise<{ vaultId: string; locationId: string }>;
-}) {
-  const { vaultId, locationId } = use(params);
-  const router = useRouter();
-  const { vault, isReadOnly, logVisit, updateLocation, deleteLocation, deleteGroup } = useVault();
+interface LocationScreenProps {
+  route: Extract<Route, { kind: "location" }>;
+}
+
+function LocationMissing() {
+  return (
+    <div
+      className="flex min-h-[60vh] flex-col items-center justify-center gap-3"
+      style={{ background: "var(--mr-bg)" }}
+    >
+      <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
+        Location not found.
+      </span>
+      <Button variant="secondary" size="sm" onClick={goBack}>
+        Back
+      </Button>
+    </div>
+  );
+}
+
+export function LocationScreen({ route }: LocationScreenProps) {
+  const isMobile = useIsMobile();
+  const { vault } = useVault();
+  const { uri, locationId, version } = route;
   const { openAdd, DialogComponent } = usePersonFormDialog();
+
+  const location = vault?.locations.find((l) => l.id === locationId);
+
+  if (!location) {
+    return <LocationMissing />;
+  }
+
+  function handleAddPerson() {
+    if (!location) return;
+    openAdd(locationId, location);
+  }
+
+  if (!isMobile) {
+    return (
+      <>
+        <div className="h-full">
+          <LocationDetailContent
+            location={location}
+            uri={uri}
+            version={version}
+            onAddPerson={handleAddPerson}
+          />
+        </div>
+        {DialogComponent}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MobileLocation route={route} onAddPerson={handleAddPerson} />
+      {DialogComponent}
+    </>
+  );
+}
+
+function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPerson: () => void }) {
+  const { vault, isReadOnly, logVisit, updateLocation, deleteLocation, deleteGroup } = useVault();
   const { showToast } = useToast();
+  const { uri, locationId, version } = route;
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -34,21 +91,8 @@ export default function LocationPage({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const location = vault?.locations.find((l) => l.id === locationId);
+  if (!location) return <LocationMissing />;
 
-  if (!location) {
-    return (
-      <div
-        className="flex min-h-[60vh] items-center justify-center"
-        style={{ background: "var(--mr-bg)" }}
-      >
-        <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
-          Location not found.
-        </span>
-      </div>
-    );
-  }
-
-  // Mobile filter state
   const hasSearch = search.length > 0;
 
   const visibleGroups = [...location.groups]
@@ -69,15 +113,11 @@ export default function LocationPage({
 
   const hasResults = visibleGroups.some((g) => g.people.length > 0);
 
-  function handleAddPerson() {
-    if (!location) return;
-    openAdd(locationId, location);
-  }
-
   function handleDeleteGroup(groupId: string, groupName: string, peopleCount: number) {
     if (peopleCount > 0) {
       showToast(
         `Move or remove all ${peopleCount} ${peopleCount === 1 ? "person" : "people"} in "${groupName}" first.`,
+        { variant: "info" },
       );
       return;
     }
@@ -93,24 +133,16 @@ export default function LocationPage({
   }
 
   function handleDeletePlace() {
+    setShowDeleteConfirm(false);
     deleteLocation(locationId);
-    router.push(`/v/${vaultId}`);
+    // Replace: the deleted place must not remain a Back destination.
+    navigate(routes.vault(uri, version), { replace: true, transition: "back" });
   }
 
   return (
     <>
-      {/* ─── Desktop center pane ─── */}
-      <div className="hidden h-full lg:block">
-        <LocationDetailContent
-          location={location}
-          vaultId={vaultId}
-          onAddPerson={handleAddPerson}
-        />
-      </div>
-
-      {/* ─── Mobile layout ─── */}
       <div
-        className="flex min-h-dvh flex-col lg:hidden"
+        className="safe-x flex min-h-dvh flex-col"
         style={{
           background: "var(--mr-bg)",
           paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
@@ -118,12 +150,12 @@ export default function LocationPage({
       >
         {/* Mobile header */}
         <div
-          className="flex items-center justify-between px-4 pt-4 pb-3"
+          className="safe-top flex items-center justify-between px-4 pt-4 pb-3"
           style={{ borderBottom: "1px solid var(--mr-edge)" }}
         >
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={goBack}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
             aria-label="Back"
           >
@@ -186,6 +218,7 @@ export default function LocationPage({
               style={{ color: "var(--mr-faint)" }}
             />
             <Input
+              type="search"
               placeholder="Search people"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -229,7 +262,7 @@ export default function LocationPage({
             <EmptyState
               heading="No one here yet"
               description="Add the first person to start tracking regulars."
-              action={!isReadOnly ? { label: "Add person", onClick: handleAddPerson } : undefined}
+              action={!isReadOnly ? { label: "Add person", onClick: onAddPerson } : undefined}
             />
           ) : (
             visibleGroups.map((group) => (
@@ -245,7 +278,7 @@ export default function LocationPage({
                     {!isReadOnly && (
                       <button
                         type="button"
-                        onClick={handleAddPerson}
+                        onClick={onAddPerson}
                         className="text-[13px] transition-opacity hover:opacity-50"
                         style={{ color: "var(--mr-accent)" }}
                       >
@@ -263,7 +296,7 @@ export default function LocationPage({
                         key={person.id}
                         person={person}
                         isReadOnly={isReadOnly}
-                        onClick={() => router.push(`/v/${vaultId}/l/${locationId}/p/${person.id}`)}
+                        onClick={() => navigate(routes.person(uri, locationId, person.id, version))}
                         onLog={() => logVisit(locationId, group.id, person.id)}
                       />
                     ))}
@@ -274,14 +307,14 @@ export default function LocationPage({
           )}
         </div>
 
-        {/* FAB — mobile only */}
+        {/* FAB */}
         {!isReadOnly && (
           <button
             type="button"
-            onClick={handleAddPerson}
+            onClick={onAddPerson}
             className="fixed flex items-center gap-2 text-[14px] font-[500] transition-all hover:brightness-110 active:opacity-70 dark:hover:brightness-90"
             style={{
-              right: 22,
+              right: "calc(22px + env(safe-area-inset-right))",
               bottom: "calc(24px + env(safe-area-inset-bottom))",
               height: 54,
               borderRadius: 28,
@@ -297,8 +330,6 @@ export default function LocationPage({
           </button>
         )}
       </div>
-
-      {DialogComponent}
 
       {/* Rename Place Modal */}
       <Modal

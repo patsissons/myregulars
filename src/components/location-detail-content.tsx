@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -13,22 +12,25 @@ import { EmptyState } from "@/components/empty-state";
 import { AnimatedList, AnimatedItem } from "@/components/animated-list";
 import { useToast } from "@/components/ui/toast";
 import { useVault } from "@/lib/vault-context";
-import type { Location } from "@/lib/datastore/types";
+import { navigate } from "@/lib/router/history";
+import { routes } from "@/lib/router/routes";
+import type { DatastoreUri, Location } from "@/lib/datastore/types";
 
 interface LocationDetailContentProps {
   location: Location;
-  vaultId: string;
+  uri: DatastoreUri;
+  version?: string;
   activePersonId?: string | null;
   onAddPerson?: () => void;
 }
 
 export function LocationDetailContent({
   location,
-  vaultId,
+  uri,
+  version,
   activePersonId,
   onAddPerson,
 }: LocationDetailContentProps) {
-  const router = useRouter();
   const { isReadOnly, deleteLocation, deleteGroup } = useVault();
   const { showToast } = useToast();
 
@@ -48,8 +50,10 @@ export function LocationDetailContent({
   }
 
   function handleDeletePlace() {
+    setShowDeleteConfirm(false);
     deleteLocation(location.id);
-    router.push(`/v/${vaultId}`);
+    // Replace: the deleted place must not remain a Back destination.
+    navigate(routes.vault(uri, version), { replace: true, transition: "none" });
   }
 
   const totalPeople = location.groups.flatMap((g) => g.people).length;
@@ -215,7 +219,7 @@ export function LocationDetailContent({
                           person={person}
                           active={person.id === activePersonId}
                           onClick={() =>
-                            router.push(`/v/${vaultId}/l/${location.id}/p/${person.id}`)
+                            navigate(routes.person(uri, location.id, person.id, version))
                           }
                         />
                       </AnimatedItem>
