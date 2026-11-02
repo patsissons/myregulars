@@ -1,0 +1,51 @@
+name: Deploy PocketBase
+
+# Pushes the committed migrations and hooks to the PocketHost instance over
+# FTP whenever they change on main. Hooks reload live; migrations apply on the
+# instance's next start, so the job ends by waking it and reminding you to
+# power-cycle from the PocketHost dashboard when a migration shipped.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pocketbase/pb_migrations/**"
+      - "pocketbase/pb_hooks/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pocketbase
+  cancel-in-progress: false
+
+jobs:
+  pockethost:
+    name: PocketHost files
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload pb_migrations
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.pockethost.io
+          username: ${{ secrets.POCKETHOST_FTP_USER }}
+          password: ${{ secrets.POCKETHOST_FTP_PASSWORD }}
+          local-dir: pocketbase/pb_migrations/
+          server-dir: ${{ vars.POCKETHOST_INSTANCE }}/pb_migrations/
+          dangerous-clean-slate: false
+
+      - name: Upload pb_hooks
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.pockethost.io
+          username: ${{ secrets.POCKETHOST_FTP_USER }}
+          password: ${{ secrets.POCKETHOST_FTP_PASSWORD }}
+          local-dir: pocketbase/pb_hooks/
+          server-dir: ${{ vars.POCKETHOST_INSTANCE }}/pb_hooks/
+          dangerous-clean-slate: false
+
+      - name: Wake the instance
+        run: |
+          curl -fsS --max-time 30 "${{ vars.NEXT_PUBLIC_POCKETBASE_URL }}/api/health" || true
+          echo "::notice::If a migration changed, power-cycle the instance from the PocketHost dashboard so it runs."
