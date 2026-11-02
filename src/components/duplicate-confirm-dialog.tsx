@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface DuplicateConfirmDialogProps {
   open: boolean;
@@ -20,17 +20,13 @@ function DuplicateConfirmDialog({
   name,
 }: DuplicateConfirmDialogProps) {
   return (
-    <Modal
+    <ResponsiveDialog
       open={open}
       onOpenChange={(o) => !o && onCancel()}
       title={`Duplicate ${entityType} name`}
-    >
-      <div className="flex flex-col gap-4 p-5">
-        <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-          A {entityType} named <strong style={{ color: "var(--mr-text)" }}>{name}</strong> already
-          exists. Do you want to create another with the same name?
-        </p>
-        <div className="flex justify-end gap-2">
+      action={{ label: "Create anyway", onClick: onConfirm }}
+      footer={
+        <div className="flex justify-end gap-2 px-5 pb-5">
           <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
@@ -38,8 +34,13 @@ function DuplicateConfirmDialog({
             Create anyway
           </Button>
         </div>
-      </div>
-    </Modal>
+      }
+    >
+      <p className="p-5 text-[14px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
+        A {entityType} named <strong style={{ color: "var(--mr-text)" }}>{name}</strong> already
+        exists. Do you want to create another with the same name?
+      </p>
+    </ResponsiveDialog>
   );
 }
 

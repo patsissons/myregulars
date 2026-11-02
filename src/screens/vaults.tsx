@@ -7,7 +7,7 @@ import { LogoMark } from "@/components/logo-mark";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { VaultCard, NewVaultCard, ImportVaultCard } from "@/components/vault-card";
 import { HostedAuthButtons } from "@/components/hosted-auth-buttons";
 import { useAuth } from "@/lib/auth-context";
@@ -343,7 +343,7 @@ function VaultsContent() {
       </div>
 
       {/* New Vault Modal */}
-      <Modal
+      <ResponsiveDialog
         open={showNewVaultModal}
         onOpenChange={(open) => {
           setShowNewVaultModal(open);
@@ -353,6 +353,32 @@ function VaultsContent() {
           }
         }}
         title="New vault"
+        historyId="new-vault"
+        action={
+          needsHostedLogin
+            ? undefined
+            : {
+                label: isCreating ? "Creating…" : "Create",
+                onClick: () => void handleCreateVault(),
+                disabled: !newVaultName.trim() || isCreating,
+              }
+        }
+        footer={
+          needsHostedLogin ? undefined : (
+            <div className="flex justify-end gap-2 px-5 pb-5">
+              <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleCreateVault}
+                disabled={!newVaultName.trim() || isCreating}
+              >
+                {isCreating ? "Creating…" : "Create vault"}
+              </Button>
+            </div>
+          )
+        }
       >
         <div className="flex flex-col gap-4 p-5">
           {providerOptions.length > 1 && (
@@ -395,6 +421,8 @@ function VaultsContent() {
                 value={newVaultName}
                 onChange={(e) => setNewVaultName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !isCreating && handleCreateVault()}
+                autoCapitalize="words"
+                enterKeyHint="done"
                 autoFocus
               />
               {createError && (
@@ -402,32 +430,46 @@ function VaultsContent() {
                   {createError}
                 </p>
               )}
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => setShowNewVaultModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleCreateVault}
-                  disabled={!newVaultName.trim() || isCreating}
-                >
-                  {isCreating ? "Creating…" : "Create vault"}
-                </Button>
-              </div>
             </>
           )}
         </div>
-      </Modal>
+      </ResponsiveDialog>
 
       {/* Import Vault Modal */}
-      <Modal
+      <ResponsiveDialog
         open={showImportModal}
         onOpenChange={(open) => {
           setShowImportModal(open);
           if (!open) resetImportState();
         }}
         title="Import vault"
+        historyId="import-vault"
         width={520}
+        action={{
+          label: isImporting ? "Importing…" : "Import",
+          onClick: () => void handleImportVault(),
+          disabled: !importedDoc || !importName.trim() || isImporting,
+        }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowImportModal(false);
+                resetImportState();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleImportVault}
+              disabled={!importedDoc || !importName.trim() || isImporting}
+            >
+              {isImporting ? "Importing…" : "Import vault"}
+            </Button>
+          </div>
+        }
       >
         <div className="flex flex-col gap-4 p-5">
           <div className="flex flex-col gap-2">
@@ -486,27 +528,8 @@ function VaultsContent() {
               disabled={!importedDoc}
             />
           </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowImportModal(false);
-                resetImportState();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleImportVault}
-              disabled={!importedDoc || !importName.trim() || isImporting}
-            >
-              {isImporting ? "Importing…" : "Import vault"}
-            </Button>
-          </div>
         </div>
-      </Modal>
+      </ResponsiveDialog>
 
       {DuplicateConfirmDialogComponent}
     </div>

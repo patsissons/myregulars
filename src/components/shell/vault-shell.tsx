@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Input } from "@/components/ui/input";
 import { LocationRow } from "@/components/ui/location-row";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { ReadOnlyBanner } from "@/components/ui/read-only-banner";
 import { LogoMark } from "@/components/logo-mark";
 import { useTheme } from "@/components/theme-provider";
@@ -17,10 +17,10 @@ import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getAllPeople, useVault } from "@/lib/vault-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
+import { useNewPlaceDialog } from "@/components/new-place-dialog";
 import { useShareDialog } from "@/components/share-dialog";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
-import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 import { VaultSearch } from "@/components/vault-search";
 import { navigate } from "@/lib/router/history";
 import { href, routes, type VaultScopedRoute } from "@/lib/router/routes";
@@ -92,7 +92,6 @@ function VaultChrome({ route, children }: VaultShellProps) {
     isHistoricalVersion,
     historicalVersionId,
     source,
-    addLocation,
     cloneVault,
     updateVaultName,
     revertToVersion,
@@ -104,11 +103,8 @@ function VaultChrome({ route, children }: VaultShellProps) {
   const { openShare, ShareDialogComponent } = useShareDialog();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(uri);
-  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
+  const { openNewPlace, NewPlaceDialogComponent } = useNewPlaceDialog();
 
-  const [showNewPlaceModal, setShowNewPlaceModal] = useState(false);
-  const [newPlaceName, setNewPlaceName] = useState("");
-  const [newPlaceDesc, setNewPlaceDesc] = useState("");
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [cloneName, setCloneName] = useState("");
   const [isCloning, setIsCloning] = useState(false);
@@ -137,18 +133,8 @@ function VaultChrome({ route, children }: VaultShellProps) {
     return loc?.groups.flatMap((g) => g.people).length ?? 0;
   }
 
-  async function handleAddPlace() {
-    if (!newPlaceName.trim()) return;
-    const existingNames = vault?.locations.map((l) => l.name) ?? [];
-    const confirmed = await checkDuplicate("place", newPlaceName.trim(), existingNames);
-    if (!confirmed) return;
-    addLocation(newPlaceName.trim(), newPlaceDesc.trim() || undefined);
-    setShowNewPlaceModal(false);
-    setNewPlaceName("");
-    setNewPlaceDesc("");
-  }
-
-  function handleRenameVault() {
+  function handleRenameVault(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!renameValue.trim()) return;
     updateVaultName(renameValue.trim());
     setShowRenameModal(false);
@@ -169,8 +155,9 @@ function VaultChrome({ route, children }: VaultShellProps) {
     }
   }
 
-  async function handleClone() {
-    if (!cloneName.trim()) return;
+  async function handleClone(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (!cloneName.trim() || isCloning) return;
     setIsCloning(true);
     setCloneError("");
     try {
@@ -238,73 +225,46 @@ function VaultChrome({ route, children }: VaultShellProps) {
 
   const dialogs = (
     <>
-      {/* New Place Modal */}
-      <Modal
-        open={showNewPlaceModal}
-        onOpenChange={(open) => {
-          setShowNewPlaceModal(open);
-          if (!open) {
-            setNewPlaceName("");
-            setNewPlaceDesc("");
-          }
-        }}
-        title="New place"
-      >
-        <div className="flex flex-col gap-4 p-5">
-          <Input
-            placeholder="The Café Around the Corner"
-            value={newPlaceName}
-            onChange={(e) => setNewPlaceName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddPlace()}
-            autoFocus
-          />
-          <Input
-            placeholder="Description (optional)"
-            value={newPlaceDesc}
-            onChange={(e) => setNewPlaceDesc(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddPlace()}
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowNewPlaceModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddPlace} disabled={!newPlaceName.trim()}>
-              Add place
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Rename Vault Modal */}
-      <Modal
+      {/* Rename Vault */}
+      <ResponsiveDialog
         open={showRenameModal}
         onOpenChange={(open) => {
           setShowRenameModal(open);
           if (!open) setRenameValue("");
         }}
         title="Rename vault"
+        historyId="rename-vault"
+        action={{ label: "Rename", form: "rename-vault-form", disabled: !renameValue.trim() }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="rename-vault-form"
+              variant="primary"
+              disabled={!renameValue.trim()}
+            >
+              Rename
+            </Button>
+          </div>
+        }
       >
-        <div className="flex flex-col gap-4 p-5">
+        <form id="rename-vault-form" onSubmit={handleRenameVault} className="p-5">
           <Input
             placeholder="Vault name"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRenameVault()}
+            autoCapitalize="words"
+            enterKeyHint="done"
             autoFocus
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleRenameVault} disabled={!renameValue.trim()}>
-              Rename
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </form>
+      </ResponsiveDialog>
 
-      {/* Clone Modal */}
-      <Modal
+      {/* Clone */}
+      <ResponsiveDialog
         open={showCloneModal}
         onOpenChange={(open) => {
           setShowCloneModal(open);
@@ -314,8 +274,29 @@ function VaultChrome({ route, children }: VaultShellProps) {
           }
         }}
         title="Clone vault"
+        historyId="clone-vault"
+        action={{
+          label: isCloning ? "Cloning…" : "Clone",
+          form: "clone-vault-form",
+          disabled: !cloneName.trim() || isCloning,
+        }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <Button variant="secondary" onClick={() => setShowCloneModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="clone-vault-form"
+              variant="primary"
+              disabled={!cloneName.trim() || isCloning}
+            >
+              {isCloning ? "Cloning…" : "Clone vault"}
+            </Button>
+          </div>
+        }
       >
-        <div className="flex flex-col gap-4 p-5">
+        <form id="clone-vault-form" onSubmit={handleClone} className="flex flex-col gap-4 p-5">
           <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
             A copy of this vault will be saved to your own storage.
           </p>
@@ -323,7 +304,8 @@ function VaultChrome({ route, children }: VaultShellProps) {
             placeholder="Vault name"
             value={cloneName}
             onChange={(e) => setCloneName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isCloning && handleClone()}
+            autoCapitalize="words"
+            enterKeyHint="done"
             autoFocus
           />
           {cloneError && (
@@ -331,36 +313,21 @@ function VaultChrome({ route, children }: VaultShellProps) {
               {cloneError}
             </p>
           )}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowCloneModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleClone}
-              disabled={!cloneName.trim() || isCloning}
-            >
-              {isCloning ? "Cloning…" : "Clone vault"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </form>
+      </ResponsiveDialog>
 
-      {/* Revert Confirmation Modal */}
-      <Modal
+      {/* Revert Confirmation */}
+      <ResponsiveDialog
         open={showRevertModal}
         onOpenChange={setShowRevertModal}
         title="Revert to this version"
-      >
-        <div className="flex flex-col gap-4 p-5">
-          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-            This will create a new version with the data from version{" "}
-            <strong className="font-mono" style={{ color: "var(--mr-text)" }}>
-              {historicalVersionId?.slice(0, 7)}
-            </strong>
-            . Your current latest version will still be available in history.
-          </p>
-          <div className="flex justify-end gap-2">
+        action={{
+          label: isReverting ? "Reverting…" : "Revert",
+          onClick: () => void handleRevert(),
+          disabled: isReverting,
+        }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
             <Button variant="secondary" onClick={() => setShowRevertModal(false)}>
               Cancel
             </Button>
@@ -368,13 +335,21 @@ function VaultChrome({ route, children }: VaultShellProps) {
               {isReverting ? "Reverting…" : "Revert"}
             </Button>
           </div>
-        </div>
-      </Modal>
+        }
+      >
+        <p className="p-5 text-[14px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
+          This will create a new version with the data from version{" "}
+          <strong className="font-mono" style={{ color: "var(--mr-text)" }}>
+            {historicalVersionId?.slice(0, 7)}
+          </strong>
+          . Your current latest version will still be available in history.
+        </p>
+      </ResponsiveDialog>
 
       {ShareDialogComponent}
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
-      {DuplicateConfirmDialogComponent}
+      {NewPlaceDialogComponent}
     </>
   );
 
@@ -524,7 +499,7 @@ function VaultChrome({ route, children }: VaultShellProps) {
             <div className="px-3 pt-1 pb-2">
               <button
                 type="button"
-                onClick={() => setShowNewPlaceModal(true)}
+                onClick={openNewPlace}
                 className="flex w-full items-center gap-1.5 rounded-[7px] px-[7px] py-[7px] text-left text-[13px] transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
                 style={{ color: "var(--mr-dim)" }}
               >
