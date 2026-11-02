@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, Server } from "lucide-react";
 import { GitHubMark } from "@/components/icons/github-mark";
 import { HostedAuthButtons } from "@/components/hosted-auth-buttons";
@@ -9,9 +8,14 @@ import { ProviderRow } from "@/components/provider-row";
 import { IconButton } from "@/components/ui/icon-button";
 import { useAuth } from "@/lib/auth-context";
 import { isHostedConfigured } from "@/lib/datastore/pocketbase-config";
+import { goBack, navigate } from "@/lib/router/history";
+import { parseReturnTo, type Route } from "@/lib/router/routes";
 
-export default function ConnectPage() {
-  const router = useRouter();
+interface ConnectScreenProps {
+  route: Extract<Route, { kind: "connect" }>;
+}
+
+export function ConnectScreen({ route }: ConnectScreenProps) {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,18 +23,17 @@ export default function ConnectPage() {
 
   const hostedEnabled = isHostedConfigured();
 
-  // Read ?returnTo= from URL (client-only)
-  const returnTo =
-    typeof window !== "undefined"
-      ? (new URLSearchParams(window.location.search).get("returnTo") ?? "/vaults")
-      : "/vaults";
+  function continueAfterSignIn() {
+    // Replace: Back from the destination should not return to the sign-in screen.
+    navigate(parseReturnTo(route.returnTo), { replace: true, transition: "none" });
+  }
 
   async function handleGitHubConnect() {
     setIsLoading(true);
     setError("");
     try {
       await login();
-      router.push(returnTo);
+      continueAfterSignIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : "GitHub authorization failed.");
       setIsLoading(false);
@@ -39,17 +42,12 @@ export default function ConnectPage() {
 
   return (
     <div
-      className="flex min-h-screen flex-col"
+      className="safe-x flex min-h-dvh flex-col"
       style={{ background: "var(--mr-bg)", color: "var(--mr-text)" }}
     >
-      <div className="mx-auto w-full max-w-[480px] px-5 py-6">
+      <div className="safe-top mx-auto w-full max-w-[480px] px-5 py-6">
         {/* Back button */}
-        <IconButton
-          icon={ChevronLeft}
-          label="Go back"
-          onClick={() => router.back()}
-          className="mb-4"
-        />
+        <IconButton icon={ChevronLeft} label="Go back" onClick={goBack} className="mb-4" />
 
         {/* Header */}
         <div className="mb-6">
@@ -97,9 +95,7 @@ export default function ConnectPage() {
                 onClick={() => setHostedExpanded((open) => !open)}
               />
 
-              {hostedExpanded && (
-                <HostedAuthButtons onAuthenticated={() => router.push(returnTo)} />
-              )}
+              {hostedExpanded && <HostedAuthButtons onAuthenticated={continueAfterSignIn} />}
             </div>
           )}
         </div>

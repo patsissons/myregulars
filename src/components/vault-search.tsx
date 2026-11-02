@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { getAllPeople, useVault } from "@/lib/vault-context";
+import { navigate } from "@/lib/router/history";
+import { routes } from "@/lib/router/routes";
+import type { DatastoreUri } from "@/lib/datastore/types";
 
 interface HighlightedTextProps {
   text: string;
@@ -26,16 +28,17 @@ function HighlightedText({ text, query }: HighlightedTextProps) {
 }
 
 interface VaultSearchProps {
-  vaultId: string;
+  uri: DatastoreUri;
+  /** Historical version being viewed, carried into result links. */
+  version?: string;
   /** Additional CSS class for the outer container */
   className?: string;
   /** Show the ⌘K keyboard-shortcut hint (desktop). Defaults to true. */
   showShortcut?: boolean;
 }
 
-export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSearchProps) {
+export function VaultSearch({ uri, version, className, showShortcut = true }: VaultSearchProps) {
   const { vault } = useVault();
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -95,9 +98,9 @@ export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSe
     (locationId: string, personId: string) => {
       setOpen(false);
       setQuery("");
-      router.push(`/v/${vaultId}/l/${locationId}/p/${personId}`);
+      navigate(routes.person(uri, locationId, personId, version));
     },
-    [router, vaultId],
+    [uri, version],
   );
 
   return (

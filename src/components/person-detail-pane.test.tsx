@@ -24,8 +24,8 @@ vi.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showToast: mocks.showToast }),
 }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocks.push }),
+vi.mock("@/lib/router/history", () => ({
+  navigate: mocks.push,
 }));
 
 const NOW = "2024-01-01T00:00:00.000Z";
@@ -63,7 +63,7 @@ function renderPane(person: Person) {
       person={person}
       group={group}
       location={location}
-      vaultId="v1"
+      uri="gist:v1"
       onClose={vi.fn()}
       onEdit={vi.fn()}
     />,

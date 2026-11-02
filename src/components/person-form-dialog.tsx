@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useIsMobile } from "@/lib/use-media";
+import { useHistorySheet } from "@/lib/router/use-route";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 import { PersonForm } from "@/components/person-form";
@@ -17,6 +18,9 @@ function PersonFormDialog({ config, onClose }: PersonFormDialogProps) {
   const isMobile = useIsMobile();
   const title = config?.mode === "add" ? "Add a person" : "Edit person";
   const open = !!config;
+
+  // System Back closes the form instead of leaving the screen underneath.
+  useHistorySheet("person-form", open, onClose);
 
   if (isMobile) {
     return (

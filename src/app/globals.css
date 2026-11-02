@@ -123,6 +123,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ─── Route transitions (CSS View Transitions, driven by the in-app router) ───
+   The router sets data-nav-dir on <html> only when it starts a transition; the
+   iOS swipe gesture and reduced-motion users get an instant swap instead. */
+@keyframes mrRouteIn {
+  from {
+    opacity: 0;
+    transform: translateX(var(--mr-route-shift, 16px));
+  }
+}
+@keyframes mrRouteOut {
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--mr-route-shift, 16px) * -0.5));
+  }
+}
+html[data-nav-dir="forward"] {
+  --mr-route-shift: 16px;
+}
+html[data-nav-dir="back"] {
+  --mr-route-shift: -16px;
+}
+html[data-nav-dir]::view-transition-old(root) {
+  animation: mrRouteOut 140ms ease-in both;
+}
+html[data-nav-dir]::view-transition-new(root) {
+  animation: mrRouteIn 180ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
 /* ─── Animation keyframes ─── */
 @keyframes mrSlideUp {
   from {

@@ -35,15 +35,15 @@ test.describe("desktop vault overview", () => {
       .click();
     await expect(page).toHaveURL(/\/l\/loc-cafe$/);
 
-    // Click the clickable vault-home button in the top bar.
-    await page.getByRole("button", { name: "Vault overview" }).click();
+    // Click the vault-home link in the top bar (a real anchor, so it is a link).
+    await page.getByRole("link", { name: "Vault overview" }).click();
     await expect(page).toHaveURL(new RegExp(`/v/${GIST_ID}$`));
     await expect(page.getByText("Select a place from the sidebar")).toBeVisible();
   });
 
   test("the decorative traffic-light dots are gone (issue 4)", async ({ page }) => {
     await page.goto(`/v/${GIST_ID}`);
-    await expect(page.getByRole("button", { name: "Vault overview" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Vault overview" })).toBeVisible();
 
     // The removed dots used these exact inline background colors.
     for (const color of ["#ff5f57", "#febc2e", "#28c840"]) {

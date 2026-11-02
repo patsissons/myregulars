@@ -7,9 +7,11 @@ import { Sheet } from "@/components/ui/sheet";
 import { listDatastoreVersions } from "@/lib/db";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { useVault } from "@/lib/vault-context";
-import type { VersionInfo } from "@/lib/datastore/types";
+import { AppLink } from "@/components/app-link";
+import { routes } from "@/lib/router/routes";
+import type { DatastoreUri, VersionInfo } from "@/lib/datastore/types";
 
-function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: string }) {
+function VersionList({ versions, uri }: { versions: VersionInfo[]; uri: DatastoreUri }) {
   const { historicalVersionId } = useVault();
 
   return (
@@ -64,8 +66,9 @@ function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: 
               </p>
             </div>
             {isLatest && historicalVersionId ? (
-              <a
-                href={`/v/${vaultId}`}
+              <AppLink
+                route={routes.vault(uri)}
+                replace
                 className="inline-flex h-[30px] items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-[500] no-underline transition-all hover:brightness-[0.92] dark:hover:brightness-[1.1]"
                 style={{
                   background: "var(--mr-subtle)",
@@ -74,10 +77,10 @@ function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: 
                 }}
               >
                 View latest
-              </a>
+              </AppLink>
             ) : !isLatest && !isViewing ? (
-              <a
-                href={`/v/${vaultId}?version=${version.id}`}
+              <AppLink
+                route={routes.vault(uri, version.id)}
                 className="inline-flex h-[30px] items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-[500] no-underline transition-all hover:brightness-[0.92] dark:hover:brightness-[1.1]"
                 style={{
                   background: "var(--mr-subtle)",
@@ -86,7 +89,7 @@ function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: 
                 }}
               >
                 View
-              </a>
+              </AppLink>
             ) : null}
           </div>
         );
@@ -95,7 +98,7 @@ function VersionList({ versions, vaultId }: { versions: VersionInfo[]; vaultId: 
   );
 }
 
-function VersionHistoryContent({ vaultId }: { vaultId: string }) {
+function VersionHistoryContent({ uri: routeUri }: { uri: DatastoreUri }) {
   const { uri } = useVault();
   const [versions, setVersions] = useState<VersionInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,23 +150,19 @@ function VersionHistoryContent({ vaultId }: { vaultId: string }) {
     );
   }
 
-  return <VersionList versions={versions} vaultId={vaultId} />;
+  return <VersionList versions={versions} uri={routeUri} />;
 }
 
 interface VersionHistoryDialogComponentProps {
   open: boolean;
   onClose: () => void;
-  vaultId: string;
+  uri: DatastoreUri;
 }
 
-function VersionHistoryDialogComponent({
-  open,
-  onClose,
-  vaultId,
-}: VersionHistoryDialogComponentProps) {
+function VersionHistoryDialogComponent({ open, onClose, uri }: VersionHistoryDialogComponentProps) {
   const isMobile = useIsMobile();
 
-  const content = open ? <VersionHistoryContent vaultId={vaultId} /> : null;
+  const content = open ? <VersionHistoryContent uri={uri} /> : null;
 
   if (isMobile) {
     return (
@@ -180,14 +179,14 @@ function VersionHistoryDialogComponent({
   );
 }
 
-export function useVersionHistoryDialog(vaultId: string) {
+export function useVersionHistoryDialog(uri: DatastoreUri) {
   const [open, setOpen] = useState(false);
 
   const openVersionHistory = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
 
   const VersionHistoryDialogComponentRendered = (
-    <VersionHistoryDialogComponent open={open} onClose={close} vaultId={vaultId} />
+    <VersionHistoryDialogComponent open={open} onClose={close} uri={uri} />
   );
 
   return {

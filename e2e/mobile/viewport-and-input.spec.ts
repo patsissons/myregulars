@@ -34,8 +34,9 @@ test("mobile vault page reserves bottom padding for browser controls (issue 12)"
   page,
 }) => {
   await page.goto(`/v/${GIST_ID}`);
-  // The mobile page container (the lg:hidden one; the layout shell is also dvh).
-  const container = page.locator("div.min-h-dvh.lg\\:hidden").first();
+  // The mobile screen container (safe-x + min-h-dvh; the vault chrome wrapper is also dvh).
+  const container = page.locator("div.safe-x.min-h-dvh").first();
+  await expect(container).toBeVisible();
   const paddingBottom = await container.evaluate((el) =>
     parseFloat(getComputedStyle(el).paddingBottom),
   );
@@ -47,7 +48,7 @@ test("mobile pages size to the dynamic viewport (issues 7, 9)", async ({ page })
   // min-height tracks the viewport (not 0 / not 100vh overflow).
   for (const path of [`/v/${GIST_ID}/l/loc-cafe`, `/v/${GIST_ID}/l/loc-cafe/p/p-alice`]) {
     await page.goto(path);
-    const container = page.locator("div.min-h-dvh.lg\\:hidden").first();
+    const container = page.locator("div.safe-x.min-h-dvh").first();
     await expect(container).toBeVisible();
     const { minHeight, innerHeight } = await container.evaluate((el) => ({
       minHeight: parseFloat(getComputedStyle(el).minHeight),

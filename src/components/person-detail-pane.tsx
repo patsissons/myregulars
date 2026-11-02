@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
 import { useLogVisitDialog } from "@/components/log-visit-dialog";
 import { Avatar } from "@/components/ui/avatar";
@@ -10,13 +9,16 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { useToast } from "@/components/ui/toast";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getAllPeople, useVault } from "@/lib/vault-context";
-import type { Group, Location, Person } from "@/lib/datastore/types";
+import { navigate } from "@/lib/router/history";
+import { routes } from "@/lib/router/routes";
+import type { DatastoreUri, Group, Location, Person } from "@/lib/datastore/types";
 
 interface PersonDetailPaneProps {
   person: Person;
   group: Group;
   location: Location;
-  vaultId: string;
+  uri: DatastoreUri;
+  version?: string;
   onClose: () => void;
   onEdit?: () => void;
 }
@@ -25,11 +27,11 @@ export function PersonDetailPane({
   person,
   group,
   location,
-  vaultId,
+  uri,
+  version,
   onClose,
   onEdit,
 }: PersonDetailPaneProps) {
-  const router = useRouter();
   const { vault, isReadOnly, logVisit } = useVault();
   const { showToast } = useToast();
 
@@ -191,7 +193,7 @@ export function PersonDetailPane({
                     key={rel.personId}
                     variant="accent"
                     onClick={() =>
-                      router.push(`/v/${vaultId}/l/${related.location.id}/p/${related.person.id}`)
+                      navigate(routes.person(uri, related.location.id, related.person.id, version))
                     }
                   >
                     {related.person.name} · {rel.kind}
