@@ -5,7 +5,8 @@ import { LogoMark } from "@/components/logo-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { normalizeDatastoreUri } from "@/lib/datastore/uri";
+import { getProviderFromUri, normalizeDatastoreUri } from "@/lib/datastore/uri";
+import { getPreferredDatastoreUri } from "@/lib/db";
 import { navigate } from "@/lib/router/history";
 import { routes, type Route } from "@/lib/router/routes";
 import { useIsMobile } from "@/lib/use-media";
@@ -41,6 +42,7 @@ export function LandingScreen({ route }: LandingScreenProps) {
 
   const open = route.open;
   const signedIn = isAuthenticated || hosted.isAuthenticated;
+  const hostedSignedIn = hosted.isAuthenticated;
 
   // A share link (`?gist=` / `?vault=`) opens the vault straight away; the
   // landing entry is replaced so Back doesn't bounce through it.
@@ -48,10 +50,19 @@ export function LandingScreen({ route }: LandingScreenProps) {
     if (open) navigate(routes.vault(open), { replace: true, transition: "none" });
   }, [open]);
 
-  // Returning users skip the pitch.
+  // Returning users skip the pitch: straight into the vault they used last
+  // when its provider is signed in (Back in its header goes to the list),
+  // otherwise to the list.
   useEffect(() => {
-    if (!open && signedIn) navigate(routes.vaults(), { replace: true, transition: "none" });
-  }, [open, signedIn]);
+    if (open || !signedIn) return;
+    const last = getPreferredDatastoreUri();
+    const lastProviderSignedIn =
+      last !== null && (getProviderFromUri(last) === "hosted" ? hostedSignedIn : isAuthenticated);
+    navigate(lastProviderSignedIn && last ? routes.vault(last) : routes.vaults(), {
+      replace: true,
+      transition: "none",
+    });
+  }, [open, signedIn, hostedSignedIn, isAuthenticated]);
 
   function handleOpenByLink() {
     if (!linkInput.trim()) {
