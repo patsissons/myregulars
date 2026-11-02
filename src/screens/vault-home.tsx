@@ -16,6 +16,8 @@ import { getAllPeople, useVault } from "@/lib/vault-context";
 import { VaultSearch } from "@/components/vault-search";
 import { useNewPlaceDialog } from "@/components/new-place-dialog";
 import { useShareDialog } from "@/components/share-dialog";
+import { useStorageSheet } from "@/components/storage/storage-sheet";
+import { useReplicaChipStatus } from "@/components/storage/use-replica-chip-status";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 import { goBack, navigate } from "@/lib/router/history";
@@ -116,6 +118,8 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(uri);
   const { openNewPlace, NewPlaceDialogComponent } = useNewPlaceDialog();
+  const { openStorage, StorageSheetComponent } = useStorageSheet(uri);
+  const chipStatus = useReplicaChipStatus(uri);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -144,7 +148,7 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
         backLabel="Back to vaults"
         right={
           <>
-            <SyncChip compact className="mr-1" />
+            <SyncChip compact className="mr-1" status={chipStatus} onClick={openStorage} />
             <IconButton icon={Share2} label="Share vault" onClick={openShare} />
             <DropdownMenu
               title={vault?.name}
@@ -160,6 +164,7 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
                         },
                       },
                     ]),
+                { label: "Storage…", onClick: openStorage },
                 { label: "View vault data", onClick: openVaultData },
                 { label: "Version history", onClick: openVersionHistory },
                 { label: "Close vault", onClick: () => navigate(routes.vaults()) },
@@ -292,6 +297,7 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
       </ResponsiveDialog>
 
       {ShareDialogComponent}
+      {StorageSheetComponent}
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
       {NewPlaceDialogComponent}

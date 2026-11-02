@@ -49,18 +49,20 @@ const LABELS: Record<
 };
 
 interface SyncChipProps {
-  /** Overrides the derived status (Phase 5 feeds mirror states from the registry). */
+  /** Overrides the derived status (the Storage sheet feeds mirror states from the registry). */
   status?: SyncStatus;
   className?: string;
   /** Icon only; the label becomes the accessible name. */
   compact?: boolean;
+  /** Makes the chip a button for non-retry states (e.g. open the Storage sheet). */
+  onClick?: () => void;
 }
 
 /**
  * One glanceable word for "is my data safe": derived from the vault store,
  * tappable to retry when a save failed.
  */
-export function SyncChip({ status: override, className, compact = false }: SyncChipProps) {
+export function SyncChip({ status: override, className, compact = false, onClick }: SyncChipProps) {
   const { isHistoricalVersion, isSyncing, dirty, error, source, retrySave } = useVault();
   const online = useOnline();
   const status =
@@ -90,16 +92,20 @@ export function SyncChip({ status: override, className, compact = false }: SyncC
     className,
   );
 
-  if (retryable) {
+  if (retryable || onClick) {
     return (
       <button
         type="button"
-        onClick={() => void retrySave()}
+        onClick={retryable ? () => void retrySave() : onClick}
         aria-label={label}
         title={label}
         data-status={status}
         className={cn(classes, "active:opacity-70")}
-        style={{ color, borderColor: "var(--mr-danger)", background: "transparent" }}
+        style={{
+          color,
+          borderColor: retryable ? "var(--mr-danger)" : undefined,
+          background: "transparent",
+        }}
       >
         {content}
       </button>

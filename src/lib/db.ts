@@ -398,6 +398,14 @@ export interface CopyResult {
 export async function copyDatastore(
   sourceUri: string,
   targetProvider: DatastoreProviderId,
+  options: {
+    /**
+     * Link the copies so saves mirror between them (default). Pass false
+     * when the source cannot be written (a shared, read-only vault): the
+     * copy becomes an independent vault with its own id.
+     */
+    link?: boolean;
+  } = {},
 ): Promise<CopyResult> {
   const uri = normalizeDatastoreUri(sourceUri);
   const sourceProvider = getProviderFromUri(uri);
@@ -407,6 +415,32 @@ export async function copyDatastore(
   }
 
   const source = await readReplica(uri);
+
+  if (options.link === false) {
+    const now = new Date();
+    const seed = withUpdatedTimestamp(
+      { ...source.document, id: crypto.randomUUID(), replicas: undefined, sync: undefined },
+      now,
+    );
+    const targetAdapter = createAdapterForProvider(targetProvider, source.document.name);
+    const created = await targetAdapter.create(seed);
+    const targetSnapshot = await cacheSnapshot(
+      snapshotFromAdapter(targetAdapter, created.uri, created.data, created.version),
+    );
+    linkReplica(seed.id, created.uri, {
+      name: seed.name ?? "",
+      lastOpened: now.toISOString(),
+      peopleCount: seed.data.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length,
+      locationCount: seed.data.locations.length,
+    });
+    const sourceSnapshot = snapshotFromAdapter(
+      source.adapter,
+      uri,
+      source.document,
+      source.version,
+    );
+    return { source: sourceSnapshot, target: targetSnapshot, hash: contentHash(seed) };
+  }
 
   if (source.document.replicas?.[targetProvider]) {
     throw new DatastoreValidationError("This vault already has a copy in that provider.");
@@ -597,6 +631,118 @@ export async function deleteDatastore(
   if (entry) {
     unlinkReplica(entry.id, provider);
   }
+}
+
+export interface ReplicaCopyInfo {
+  uri: DatastoreUri;
+  updatedAt: string;
+  peopleCount: number;
+  locationCount: number;
+}
+
+export interface ReplicaStatusResult {
+  uri: DatastoreUri;
+  siblingUri: DatastoreUri | null;
+  /** Null when the vault has a single copy. */
+  status: SyncStatus | null;
+  entry: VaultRegistryEntry | null;
+  copies: Partial<Record<DatastoreProviderId, ReplicaCopyInfo>>;
+}
+
+function copyInfo(uri: DatastoreUri, document: MyRegularsDocument): ReplicaCopyInfo {
+  return {
+    uri,
+    updatedAt: document.updatedAt,
+    peopleCount: document.data.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length,
+    locationCount: document.data.locations.length,
+  };
+}
+
+/** Reads both copies of a vault and reports how they relate, without writing anything. */
+export async function getReplicaStatus(vaultUri: string): Promise<ReplicaStatusResult> {
+  const uri = normalizeDatastoreUri(vaultUri);
+  const primary = await readReplica(uri);
+  const entry = findEntry(uri, primary.document);
+  const siblingUri = siblingUriFor(uri, primary.document, entry);
+  const primaryProvider = getProviderFromUri(uri);
+  const copies: ReplicaStatusResult["copies"] = {
+    [primaryProvider]: copyInfo(uri, primary.document),
+  };
+
+  if (!siblingUri) {
+    return { uri, siblingUri: null, status: null, entry, copies };
+  }
+
+  const sibling = await readReplica(siblingUri);
+  const siblingProv = getProviderFromUri(siblingUri);
+  copies[siblingProv] = copyInfo(siblingUri, sibling.document);
+  const status = computeSyncStatus(
+    replicaStateOf(primaryProvider, primary.document),
+    replicaStateOf(siblingProv, sibling.document),
+    entry?.agreed,
+  );
+  return { uri, siblingUri, status, entry, copies };
+}
+
+/**
+ * Settles diverged copies by overwriting the other copy with `keep`'s
+ * content. Both copies end up in sync on `keep`'s hash.
+ */
+export async function resolveReplicaConflict(
+  vaultUri: string,
+  keep: DatastoreProviderId,
+): Promise<ReplicaSyncResult> {
+  const uri = normalizeDatastoreUri(vaultUri);
+  const primary = await readReplica(uri);
+  const entry = findEntry(uri, primary.document);
+  const siblingUri = siblingUriFor(uri, primary.document, entry);
+  if (!siblingUri) {
+    throw new DatastoreValidationError("This vault has no other copy to resolve against.");
+  }
+  const sibling = await readReplica(siblingUri);
+  const primaryProvider = getProviderFromUri(uri);
+
+  const winner = keep === primaryProvider ? primary : sibling;
+  const loser = keep === primaryProvider ? sibling : primary;
+  const winnerUri = keep === primaryProvider ? uri : siblingUri;
+  const loserUri = keep === primaryProvider ? siblingUri : uri;
+
+  const hash = contentHash(winner.document);
+  const updated = withUpdatedTimestamp(
+    withSyncBase(
+      withReplicaLink(
+        adoptContent(loser.document, winner.document),
+        getProviderFromUri(winnerUri),
+        getIdFromUri(winnerUri),
+      ),
+      hash,
+    ),
+  );
+  const version = await loser.adapter.write(updated, { expectedVersion: loser.version });
+  const loserSnapshot = await cacheSnapshot(
+    snapshotFromAdapter(loser.adapter, loserUri, updated, version),
+  );
+  const winnerSnapshot = await cacheSnapshot(
+    snapshotFromAdapter(winner.adapter, winnerUri, winner.document, winner.version),
+  );
+  if (entry) {
+    updateRegistryEntry(entry.id, { agreed: hash, pendingMirror: undefined });
+  }
+
+  return {
+    status: { kind: "inSync", hash },
+    applied: true,
+    primary: keep === primaryProvider ? winnerSnapshot : loserSnapshot,
+    sibling: keep === primaryProvider ? loserSnapshot : winnerSnapshot,
+  };
+}
+
+/** Marks which copy the user prefers to open from the vault list. */
+export function setPrimaryReplica(vaultUri: string): void {
+  const uri = normalizeDatastoreUri(vaultUri);
+  const entry = findRegistryEntryByUri(uri);
+  if (entry) updateRegistryEntry(entry.id, { primary: getProviderFromUri(uri) });
+  datastoreCache.setPreferredUri(uri);
 }
 
 /** Hosted only: toggles whether anyone with the link may read the vault. */

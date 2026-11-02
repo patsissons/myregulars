@@ -16,15 +16,17 @@ import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getProviderFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, useVault } from "@/lib/vault-context";
-import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { useNewPlaceDialog } from "@/components/new-place-dialog";
 import { useShareDialog } from "@/components/share-dialog";
+import { useStorageSheet } from "@/components/storage/storage-sheet";
+import { useReplicaChipStatus } from "@/components/storage/use-replica-chip-status";
+import { SyncChip } from "@/components/ui/sync-chip";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
 import { VaultSearch } from "@/components/vault-search";
 import { navigate } from "@/lib/router/history";
-import { href, routes, type VaultScopedRoute } from "@/lib/router/routes";
+import { routes, type VaultScopedRoute } from "@/lib/router/routes";
 import { useIsMobile } from "@/lib/use-media";
 
 interface VaultShellProps {
@@ -88,16 +90,12 @@ function VaultChrome({ route, children }: VaultShellProps) {
   const { theme, toggleTheme } = useTheme();
   const {
     vault,
-    isSyncing,
     isReadOnly,
     isHistoricalVersion,
     historicalVersionId,
-    source,
-    cloneVault,
     updateVaultName,
     revertToVersion,
   } = useVault();
-  const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const { uri } = route;
 
@@ -105,19 +103,15 @@ function VaultChrome({ route, children }: VaultShellProps) {
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(uri);
   const { openNewPlace, NewPlaceDialogComponent } = useNewPlaceDialog();
+  const { openStorage, StorageSheetComponent } = useStorageSheet(uri);
+  const chipStatus = useReplicaChipStatus(uri);
 
-  const [showCloneModal, setShowCloneModal] = useState(false);
-  const [cloneName, setCloneName] = useState("");
-  const [isCloning, setIsCloning] = useState(false);
-  const [cloneError, setCloneError] = useState("");
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
   const activeLocationId = route.kind === "vault" ? null : route.locationId;
-
-  const syncLabel = isSyncing ? "syncing…" : source === "cache" ? "offline copy" : "saved";
 
   const filteredLocations = [...(vault?.locations ?? [])].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
@@ -153,23 +147,6 @@ function VaultChrome({ route, children }: VaultShellProps) {
     } finally {
       setIsReverting(false);
       setShowRevertModal(false);
-    }
-  }
-
-  async function handleClone(event?: React.FormEvent) {
-    event?.preventDefault();
-    if (!cloneName.trim() || isCloning) return;
-    setIsCloning(true);
-    setCloneError("");
-    try {
-      const newUri = await cloneVault(cloneName.trim());
-      showToast("Vault cloned!");
-      setShowCloneModal(false);
-      navigate(routes.vault(newUri));
-    } catch (err) {
-      setCloneError(err instanceof Error ? err.message : "Failed to clone vault.");
-    } finally {
-      setIsCloning(false);
     }
   }
 
@@ -209,18 +186,7 @@ function VaultChrome({ route, children }: VaultShellProps) {
 
       {/* Read-only banner */}
       {isReadOnly && !isHistoricalVersion && (
-        <ReadOnlyBanner
-          provider={getProviderFromUri(uri)}
-          onClone={() => {
-            if (!isAuthenticated) {
-              navigate(routes.connect(href(route)));
-              return;
-            }
-            const baseName = vault?.name ?? "Vault";
-            setCloneName(`${baseName} — copy`);
-            setShowCloneModal(true);
-          }}
-        />
+        <ReadOnlyBanner provider={getProviderFromUri(uri)} onClone={openStorage} />
       )}
     </>
   );
@@ -265,59 +231,6 @@ function VaultChrome({ route, children }: VaultShellProps) {
         </form>
       </ResponsiveDialog>
 
-      {/* Clone */}
-      <ResponsiveDialog
-        open={showCloneModal}
-        onOpenChange={(open) => {
-          setShowCloneModal(open);
-          if (!open) {
-            setCloneName("");
-            setCloneError("");
-          }
-        }}
-        title="Clone vault"
-        historyId="clone-vault"
-        action={{
-          label: isCloning ? "Cloning…" : "Clone",
-          form: "clone-vault-form",
-          disabled: !cloneName.trim() || isCloning,
-        }}
-        footer={
-          <div className="flex justify-end gap-2 px-5 pb-5">
-            <Button variant="secondary" onClick={() => setShowCloneModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="clone-vault-form"
-              variant="primary"
-              disabled={!cloneName.trim() || isCloning}
-            >
-              {isCloning ? "Cloning…" : "Clone vault"}
-            </Button>
-          </div>
-        }
-      >
-        <form id="clone-vault-form" onSubmit={handleClone} className="flex flex-col gap-4 p-5">
-          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-            A copy of this vault will be saved to your own storage.
-          </p>
-          <Input
-            placeholder="Vault name"
-            value={cloneName}
-            onChange={(e) => setCloneName(e.target.value)}
-            autoCapitalize="words"
-            enterKeyHint="done"
-            autoFocus
-          />
-          {cloneError && (
-            <p className="text-[13px]" style={{ color: "var(--mr-danger)" }}>
-              {cloneError}
-            </p>
-          )}
-        </form>
-      </ResponsiveDialog>
-
       {/* Revert Confirmation */}
       <ResponsiveDialog
         open={showRevertModal}
@@ -349,6 +262,7 @@ function VaultChrome({ route, children }: VaultShellProps) {
       </ResponsiveDialog>
 
       {ShareDialogComponent}
+      {StorageSheetComponent}
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
       {NewPlaceDialogComponent}
@@ -401,13 +315,11 @@ function VaultChrome({ route, children }: VaultShellProps) {
           >
             {vault?.name ?? "Vault"}
           </span>
-          <span className="shrink-0 text-[11px]" style={{ color: "var(--mr-faint)" }}>
-            · {syncLabel}
-          </span>
         </AppLink>
 
         {/* Right actions */}
         <div className="flex items-center gap-1">
+          <SyncChip className="mr-1" status={chipStatus} onClick={openStorage} />
           <button
             type="button"
             onClick={openShare}
@@ -443,6 +355,7 @@ function VaultChrome({ route, children }: VaultShellProps) {
                   setShowRenameModal(true);
                 },
               },
+              { label: "Storage…", onClick: openStorage },
               { label: "View vault data", onClick: openVaultData },
               { label: "Version history", onClick: openVersionHistory },
               { label: "Close vault", onClick: () => navigate(routes.vaults()) },
