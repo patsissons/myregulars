@@ -1,3 +1,4 @@
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -7,6 +8,11 @@ describe("Button", () => {
   it("renders children", () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+  });
+
+  it("defaults to type=button so it never submits a surrounding form by accident", () => {
+    render(<Button>Save</Button>);
+    expect(screen.getByRole("button").getAttribute("type")).toBe("button");
   });
 
   it("calls onClick when clicked", async () => {
@@ -31,36 +37,52 @@ describe("Button", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("applies primary variant background", () => {
+  it("applies variant classes from the token palette", () => {
     render(<Button variant="primary">Go</Button>);
-    const button = screen.getByRole("button");
-    expect(button.style.background).toContain("var(--mr-accent)");
+    expect(screen.getByRole("button").className).toContain("bg-mr-accent");
   });
 
-  it("applies secondary variant border (transparent background)", () => {
+  it("gives transparent variants a visible hover tint", () => {
     render(<Button variant="secondary">Go</Button>);
     const button = screen.getByRole("button");
-    expect(button.style.background).toBe("transparent");
-    expect(button.getAttribute("style")).toContain("var(--mr-edge-strong)");
+    expect(button.className).toContain("border-mr-edge-strong");
+    expect(button.className).toContain("hover:bg-black/[0.05]");
   });
 
-  // Regression: transparent variants previously only had hover:brightness, which
-  // is invisible on a transparent background. They need an important background
-  // tint that overrides the inline `background: transparent`.
-  it("includes an important background-tint hover for transparent variants", () => {
-    render(<Button variant="secondary">Go</Button>);
-    const button = screen.getByRole("button");
-    expect(button.className).toContain("hover:bg-black/[0.05]!");
-    expect(button.className).toContain("dark:hover:bg-white/[0.07]!");
-  });
-
-  it("keeps a brightness hover for the filled primary variant", () => {
-    render(<Button variant="primary">Go</Button>);
-    expect(screen.getByRole("button").className).toContain("hover:brightness-95");
-  });
-
-  it("applies size classes", () => {
+  it("applies size classes and a 44px touch minimum", () => {
     render(<Button size="lg">Go</Button>);
-    expect(screen.getByRole("button").className).toContain("h-10");
+    const button = screen.getByRole("button");
+    expect(button.className).toContain("h-10");
+    expect(button.className).toContain("coarse:min-h-11");
+  });
+
+  it("passes arbitrary button attributes through", () => {
+    render(
+      <Button aria-pressed="true" data-testid="x" form="f1">
+        Go
+      </Button>,
+    );
+    const button = screen.getByTestId("x");
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.getAttribute("form")).toBe("f1");
+  });
+
+  it("forwards its ref", () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>Go</Button>);
+    expect(ref.current?.tagName).toBe("BUTTON");
+  });
+
+  it("renders the child element with asChild", () => {
+    render(
+      <Button asChild variant="primary">
+        <a href="#vaults">Vaults</a>
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Vaults" });
+    expect(link.getAttribute("href")).toBe("#vaults");
+    expect(link.className).toContain("bg-mr-accent");
+    expect(link.getAttribute("type")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

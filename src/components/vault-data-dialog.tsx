@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useIsMobile } from "@/lib/use-media";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Sheet } from "@/components/ui/sheet";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { createEmptyDocument } from "@/lib/datastore/schema";
 import { useVault } from "@/lib/vault-context";
 
@@ -137,7 +135,6 @@ interface VaultDataDialogComponentProps {
 
 function VaultDataDialogComponent({ open, onClose }: VaultDataDialogComponentProps) {
   const { vault } = useVault();
-  const isMobile = useIsMobile();
 
   const json = useMemo(() => {
     if (!vault) return "";
@@ -159,18 +156,17 @@ function VaultDataDialogComponent({ open, onClose }: VaultDataDialogComponentPro
       </>
     ) : null;
 
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="Vault data">
-        {content}
-      </Sheet>
-    );
-  }
-
   return (
-    <Modal open={open} onOpenChange={(o) => !o && onClose()} title="Vault data" width={640}>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title="Vault data"
+      historyId="vault-data"
+      cancelLabel="Done"
+      width={640}
+    >
       {content}
-    </Modal>
+    </ResponsiveDialog>
   );
 }
 

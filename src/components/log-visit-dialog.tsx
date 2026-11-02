@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { localDateString } from "@/lib/datastore/helpers";
+
+const FORM_ID = "log-visit-form";
 
 interface LogVisitDialogProps {
   open: boolean;
@@ -36,8 +38,24 @@ export function LogVisitDialog({ open, onOpenChange, onLog }: LogVisitDialogProp
   }
 
   return (
-    <Modal open={open} onOpenChange={handleOpenChange} title="Log a visit">
-      <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Log a visit"
+      historyId="log-visit"
+      action={{ label: "Log visit", form: FORM_ID }}
+      footer={
+        <div className="flex justify-end gap-2 px-5 pb-5">
+          <Button type="button" variant="secondary" onClick={() => handleOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" form={FORM_ID} variant="primary">
+            Log visit
+          </Button>
+        </div>
+      }
+    >
+      <form id={FORM_ID} className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
         <div>
           <label
             htmlFor="log-visit-date"
@@ -69,18 +87,12 @@ export function LogVisitDialog({ open, onOpenChange, onLog }: LogVisitDialogProp
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
+            autoCapitalize="sentences"
+            enterKeyHint="done"
           />
         </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => handleOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary">
-            Log visit
-          </Button>
-        </div>
       </form>
-    </Modal>
+    </ResponsiveDialog>
   );
 }
 

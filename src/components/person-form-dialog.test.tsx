@@ -6,6 +6,7 @@ import type { Location } from "@/lib/datastore/types";
 
 // Stub the form so the dialog renders in isolation without vault context.
 vi.mock("@/components/person-form", () => ({
+  PERSON_FORM_ID: "person-form",
   PersonForm: () => <div data-testid="person-form">form body</div>,
 }));
 

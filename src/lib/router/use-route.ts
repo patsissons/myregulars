@@ -20,7 +20,11 @@ export function useRouterState(): RouterState | null {
  * gesture closes it instead of leaving the screen. Closing from the UI pops
  * the entry; a reload drops the entry, after which this is a no-op.
  */
-export function useHistorySheet(id: string, open: boolean, onClose: () => void): void {
+export function useHistorySheet(
+  id: string | null | undefined,
+  open: boolean,
+  onClose: () => void,
+): void {
   const routerState = useRouterState();
   const wasOpen = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -29,6 +33,7 @@ export function useHistorySheet(id: string, open: boolean, onClose: () => void):
   }, [onClose]);
 
   useEffect(() => {
+    if (!id) return;
     if (open && !wasOpen.current) {
       pushSheetEntry(id);
     } else if (!open && wasOpen.current) {
@@ -38,6 +43,7 @@ export function useHistorySheet(id: string, open: boolean, onClose: () => void):
   }, [open, id]);
 
   useEffect(() => {
+    if (!id) return;
     // The entry disappeared (system Back) while the UI still shows the sheet.
     // Read live state: the effect above may have just pushed the entry in the
     // same commit, before the subscription re-rendered us.

@@ -1,16 +1,19 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 import { PersonDetailPane } from "@/components/person-detail-pane";
 import { LocationDetailContent } from "@/components/location-detail-content";
 import { useLogVisitDialog } from "@/components/log-visit-dialog";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
+import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
+import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { useToast } from "@/components/ui/toast";
-import { formatLastSeen } from "@/lib/datastore/helpers";
-import { findPerson, useVault } from "@/lib/vault-context";
+import { formatLastSeen, localDateString } from "@/lib/datastore/helpers";
+import type { Person } from "@/lib/datastore/types";
+import { findPerson, getAllPeople, useVault } from "@/lib/vault-context";
 import { goBack, navigate } from "@/lib/router/history";
 import { routes, type Route } from "@/lib/router/routes";
 import { useIsMobile } from "@/lib/use-media";
@@ -19,9 +22,13 @@ interface PersonScreenProps {
   route: Extract<Route, { kind: "person" }>;
 }
 
+function loggedToday(person: Person): boolean {
+  return person.lastSeen?.slice(0, 10) === localDateString();
+}
+
 export function PersonScreen({ route }: PersonScreenProps) {
   const isMobile = useIsMobile();
-  const { vault, isReadOnly, logVisit } = useVault();
+  const { vault, isReadOnly, logVisit, updatePerson } = useVault();
   const { showToast } = useToast();
   const { openAdd, openEdit, DialogComponent } = usePersonFormDialog();
   const { uri, locationId, personId, version } = route;
@@ -33,9 +40,19 @@ export function PersonScreen({ route }: PersonScreenProps) {
   // only when invoked, by which point `result` is guaranteed.
   const { openLogVisit, LogVisitDialogComponent } = useLogVisitDialog((day, note) => {
     if (!result) return;
-    logVisit(locationId, result.group.id, personId, note, day);
-    showToast("Visit logged");
+    logVisitWithUndo(result.group.id, result.person, note, day);
   });
+
+  function logVisitWithUndo(groupId: string, person: Person, note?: string, day?: string) {
+    const before = { lastSeen: person.lastSeen, visitLog: person.visitLog };
+    logVisit(locationId, groupId, person.id, note, day);
+    showToast("Visit logged", {
+      action: {
+        label: "Undo",
+        onClick: () => updatePerson(locationId, groupId, person.id, before),
+      },
+    });
+  }
 
   if (!result || !location) {
     return (
@@ -63,11 +80,6 @@ export function PersonScreen({ route }: PersonScreenProps) {
   function handleEdit() {
     if (!location) return;
     openEdit(locationId, group.id, person, location);
-  }
-
-  function handleSawToday() {
-    logVisit(location!.id, group.id, person.id);
-    showToast("Visit logged");
   }
 
   if (!isMobile) {
@@ -107,36 +119,33 @@ export function PersonScreen({ route }: PersonScreenProps) {
     );
   }
 
+  const isLoggedToday = loggedToday(person);
+  const everyone = getAllPeople(vault);
+  const relationships = (person.relationships ?? [])
+    .map((rel) => {
+      const match = everyone.find((entry) => entry.person.id === rel.personId);
+      return match ? { ...rel, ...match } : null;
+    })
+    .filter((rel) => rel !== null);
+
   return (
     <>
       <div
         className="safe-x flex min-h-dvh flex-col"
         style={{ background: "var(--mr-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {/* Mobile header */}
-        <div
-          className="safe-top flex shrink-0 items-center justify-between px-4 pt-4 pb-3"
-          style={{ borderBottom: "1px solid var(--mr-edge)" }}
-        >
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-            aria-label="Back"
-          >
-            <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
-          </button>
-          {!isReadOnly && (
-            <button
-              type="button"
-              onClick={handleEdit}
-              className="text-[14px] font-[500] transition-opacity hover:opacity-50"
-              style={{ color: "var(--mr-accent)" }}
-            >
-              Edit
-            </button>
-          )}
-        </div>
+        <PageHeader
+          onBack={goBack}
+          title={location.name}
+          right={
+            !isReadOnly && (
+              <Button variant="ghost" size="md" onClick={handleEdit} className="text-mr-accent">
+                <Pencil size={14} aria-hidden="true" />
+                Edit
+              </Button>
+            )
+          }
+        />
 
         {/* Hero */}
         <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-5">
@@ -157,20 +166,32 @@ export function PersonScreen({ route }: PersonScreenProps) {
             <p className="mt-1 text-[13px]" style={{ color: "var(--mr-dim)" }}>
               {group.name} · {location.name}
             </p>
-            {person.lastSeen && (
-              <p className="mt-1 text-[12px]" style={{ color: "var(--mr-faint)" }}>
-                Last seen {formatLastSeen(person.lastSeen)}
-              </p>
-            )}
+            <p className="mt-1 text-[12px]" style={{ color: "var(--mr-faint)" }}>
+              {person.lastSeen ? `Last seen ${formatLastSeen(person.lastSeen)}` : "Not seen yet"}
+            </p>
           </div>
 
           {/* Action row */}
           {!isReadOnly && (
             <div className="mt-1 flex w-full gap-2">
-              <Button variant="primary" size="lg" fullWidth onClick={handleSawToday}>
-                Saw today
+              <Button
+                variant={isLoggedToday ? "secondary" : "primary"}
+                size="lg"
+                fullWidth
+                disabled={isLoggedToday}
+                onClick={() => logVisitWithUndo(group.id, person)}
+                className="min-h-[48px]"
+              >
+                {isLoggedToday ? (
+                  <>
+                    <Check size={16} aria-hidden="true" />
+                    Logged today
+                  </>
+                ) : (
+                  "Saw today"
+                )}
               </Button>
-              <Button variant="secondary" size="lg" onClick={openLogVisit}>
+              <Button variant="secondary" size="lg" onClick={openLogVisit} className="min-h-[48px]">
                 Log…
               </Button>
             </div>
@@ -182,7 +203,7 @@ export function PersonScreen({ route }: PersonScreenProps) {
           {/* Notes */}
           <div>
             <Eyebrow className="mb-2 block">Notes</Eyebrow>
-            <p className="text-[13px] leading-relaxed" style={{ color: "var(--mr-text)" }}>
+            <p className="text-[14px] leading-relaxed" style={{ color: "var(--mr-text)" }}>
               {person.detail || <span style={{ color: "var(--mr-faint)" }}>No notes yet.</span>}
             </p>
           </div>
@@ -191,9 +212,34 @@ export function PersonScreen({ route }: PersonScreenProps) {
           {person.pets && person.pets.length > 0 && (
             <div>
               <Eyebrow className="mb-2 block">Pets</Eyebrow>
-              <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-                {person.pets.map((pet) => `${pet.name} (${pet.species})`).join(", ")}
-              </p>
+              <div className="flex flex-wrap gap-2">
+                {person.pets.map((pet, idx) => (
+                  <Chip key={idx}>
+                    {pet.name} · {pet.species}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Relationships */}
+          {relationships.length > 0 && (
+            <div>
+              <Eyebrow className="mb-2 block">Knows</Eyebrow>
+              <div className="flex flex-wrap gap-2">
+                {relationships.map((rel) => (
+                  <Chip
+                    key={`${rel.kind}-${rel.personId}`}
+                    variant="accent"
+                    onClick={() =>
+                      navigate(routes.person(uri, rel.location.id, rel.person.id, version))
+                    }
+                  >
+                    {rel.person.name}
+                    <span className="ml-1 opacity-70">· {rel.kind}</span>
+                  </Chip>
+                ))}
+              </div>
             </div>
           )}
 
@@ -206,23 +252,26 @@ export function PersonScreen({ route }: PersonScreenProps) {
               </p>
             ) : (
               <div
-                className="flex flex-col overflow-hidden rounded-[10px]"
-                style={{ border: "1px solid var(--mr-edge)" }}
+                className="flex flex-col overflow-hidden rounded-[12px]"
+                style={{ border: "1px solid var(--mr-edge)", background: "var(--mr-panel)" }}
               >
                 {person.visitLog.slice(0, 10).map((entry, idx) => (
                   <div
                     key={idx}
-                    className="flex items-baseline gap-3 px-3 py-2"
+                    className="flex items-baseline gap-3 px-3 py-2.5"
                     style={{
                       borderTop: idx > 0 ? "1px solid var(--mr-edge)" : undefined,
                     }}
                   >
                     <span
-                      className="shrink-0 font-mono text-[12px]"
-                      style={{
-                        color: "var(--mr-text)",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
+                      className="w-[72px] shrink-0 text-[13px] font-medium"
+                      style={{ color: "var(--mr-text)" }}
+                    >
+                      {formatLastSeen(entry.date)}
+                    </span>
+                    <span
+                      className="shrink-0 font-mono text-[11px]"
+                      style={{ color: "var(--mr-faint)", fontVariantNumeric: "tabular-nums" }}
                     >
                       {entry.date.slice(0, 10)}
                     </span>

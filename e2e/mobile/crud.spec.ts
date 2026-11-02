@@ -13,27 +13,40 @@ test.describe("mobile CRUD journeys", () => {
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
     await sheet.getByPlaceholder("Name", { exact: true }).fill("Zoe Quartz");
-    await sheet.getByRole("button", { name: "Add person" }).click();
+    // The sheet header's Add submits the form.
+    await sheet.getByRole("button", { name: "Add", exact: true }).click();
 
-    await expect(page.getByText("Zoe Quartz").filter({ visible: true }).first()).toBeVisible();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByText("Zoe Quartz")).toBeVisible();
   });
 
-  test("add a place via the prompt", async ({ page }) => {
+  test("add a place via the sheet", async ({ page }) => {
     await page.goto(`/v/${GIST_ID}`);
 
-    page.once("dialog", (dialog) => dialog.accept("Riverside Diner"));
     await page.getByRole("button", { name: "Add a place" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    const addButton = sheet.getByRole("button", { name: "Add", exact: true });
+    await expect(addButton).toBeDisabled();
+    await sheet.getByLabel("Place name").fill("Riverside Diner");
+    await sheet.getByLabel("Description (optional)").fill("Sunday brunch");
+    await addButton.click();
 
-    // The hidden desktop sidebar also lists places; assert the visible mobile one.
-    await expect(page.getByText("Riverside Diner").filter({ visible: true }).first()).toBeVisible();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByText("Riverside Diner")).toBeVisible();
+    await expect(page.getByText(/Sunday brunch/)).toBeVisible();
   });
 
   test("log a visit from the person page", async ({ page }) => {
     await page.goto(`/v/${GIST_ID}/l/loc-cafe/p/p-alice`);
 
-    // Quick path: one tap, with feedback.
+    // Quick path: one tap, with feedback and an Undo.
     await page.getByRole("button", { name: "Saw today" }).click();
-    await expect(page.getByRole("status")).toContainText("Visit logged");
+    const toast = page.getByRole("status").filter({ hasText: "Visit logged" });
+    await expect(toast).toBeVisible();
+    await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
+    // Today is now logged, so the primary button becomes a disabled state.
+    await expect(page.getByRole("button", { name: "Logged today" })).toBeDisabled();
 
     // Detailed path: the Log… dialog used to be inert on mobile.
     await page.getByRole("button", { name: "Log…" }).click();
@@ -44,8 +57,18 @@ test.describe("mobile CRUD journeys", () => {
     await dialog.getByRole("button", { name: "Log visit" }).click();
 
     await expect(dialog).toBeHidden();
-    await expect(page.getByText("2026-06-10").filter({ visible: true }).first()).toBeVisible();
-    await expect(page.getByText("Trivia night").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText("2026-06-10")).toBeVisible();
+    await expect(page.getByText("Trivia night")).toBeVisible();
+  });
+
+  test("undo restores the previous visit state", async ({ page }) => {
+    await page.goto(`/v/${GIST_ID}/l/loc-cafe/p/p-alice`);
+
+    await page.getByRole("button", { name: "Saw today" }).click();
+    await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+
+    await expect(page.getByRole("button", { name: "Saw today" })).toBeEnabled();
+    await expect(page.getByRole("status").filter({ hasText: "Visit logged" })).toBeHidden();
   });
 
   test("rename a place from the header menu", async ({ page }) => {

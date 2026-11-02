@@ -90,6 +90,62 @@ describe("ToastProvider / useToast", () => {
     expect(screen.queryByText("Nope")).toBeNull();
   });
 
+  it("renders an action button that runs the callback and dismisses", async () => {
+    const user = userEvent.setup();
+    const onUndo = vi.fn();
+    function WithAction() {
+      const { showToast } = useToast();
+      return (
+        <button
+          type="button"
+          onClick={() => showToast("Logged", { action: { label: "Undo", onClick: onUndo } })}
+        >
+          show
+        </button>
+      );
+    }
+    render(
+      <ToastProvider>
+        <WithAction />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByText("show"));
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("keeps a toast with an action up longer than a plain one", () => {
+    vi.useFakeTimers();
+    function WithAction() {
+      const { showToast } = useToast();
+      return (
+        <button
+          type="button"
+          onClick={() => showToast("Logged", { action: { label: "Undo", onClick: () => {} } })}
+        >
+          show
+        </button>
+      );
+    }
+    render(
+      <ToastProvider>
+        <WithAction />
+      </ToastProvider>,
+    );
+    act(() => {
+      screen.getByText("show").click();
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.getByText("Logged")).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(screen.queryByText("Logged")).toBeNull();
+  });
+
   it("useOptionalToast returns null outside a provider", () => {
     const { result } = renderHook(() => useOptionalToast());
     expect(result.current).toBeNull();

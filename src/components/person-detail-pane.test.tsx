@@ -26,6 +26,11 @@ vi.mock("@/components/ui/toast", () => ({
 
 vi.mock("@/lib/router/history", () => ({
   navigate: mocks.push,
+  subscribeRouter: () => () => {},
+  getRouterState: () => null,
+  getServerRouterState: () => null,
+  pushSheetEntry: () => {},
+  popSheetEntry: () => false,
 }));
 
 const NOW = "2024-01-01T00:00:00.000Z";

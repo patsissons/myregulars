@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useIsMobile } from "@/lib/use-media";
-import { useHistorySheet } from "@/lib/router/use-route";
-import { Modal } from "@/components/ui/modal";
-import { Sheet } from "@/components/ui/sheet";
-import { PersonForm } from "@/components/person-form";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { PersonForm, PERSON_FORM_ID } from "@/components/person-form";
 import type { Location, Person } from "@/lib/datastore/types";
 import type { PersonFormConfig } from "@/components/person-form";
+import { useIsMobile } from "@/lib/use-media";
 
 interface PersonFormDialogProps {
   config: PersonFormConfig | null;
@@ -16,24 +14,21 @@ interface PersonFormDialogProps {
 
 function PersonFormDialog({ config, onClose }: PersonFormDialogProps) {
   const isMobile = useIsMobile();
-  const title = config?.mode === "add" ? "Add a person" : "Edit person";
+  const isAdd = config?.mode === "add";
   const open = !!config;
 
-  // System Back closes the form instead of leaving the screen underneath.
-  useHistorySheet("person-form", open, onClose);
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title}>
-        {config && <PersonForm config={config} onClose={onClose} />}
-      </Sheet>
-    );
-  }
-
   return (
-    <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
-      {config && <PersonForm config={config} onClose={onClose} />}
-    </Modal>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={isAdd ? "Add a person" : "Edit person"}
+      historyId="person-form"
+      action={{ label: isAdd ? "Add" : "Save", form: PERSON_FORM_ID }}
+    >
+      {config && (
+        <PersonForm config={config} onClose={onClose} layout={isMobile ? "sheet" : "modal"} />
+      )}
+    </ResponsiveDialog>
   );
 }
 

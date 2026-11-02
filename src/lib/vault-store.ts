@@ -121,6 +121,8 @@ export interface VaultActions {
   revertToVersion: () => Promise<void>;
   /** Saves any pending edits now (used when the page is hidden or unloaded). */
   flushPendingSave: () => Promise<void>;
+  /** Re-attempts a save after a failure, skipping the debounce. */
+  retrySave: () => Promise<void>;
 }
 
 export type VaultEvent = { type: "toast"; message: string; variant?: ToastVariant };
@@ -366,6 +368,14 @@ function scheduleSync(): void {
     debounceTimer = null;
     void runSave();
   }, DEBOUNCE_MS);
+}
+
+function retrySave(): Promise<void> {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  return runSave();
 }
 
 async function flushPendingSave(): Promise<void> {
@@ -962,4 +972,5 @@ export const vaultActions: VaultActions = {
   cloneVault,
   revertToVersion,
   flushPendingSave,
+  retrySave,
 };
