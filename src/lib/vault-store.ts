@@ -29,6 +29,7 @@ import {
   writeOutbox,
 } from "@/lib/db";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
+import { setDatastorePublic } from "@/lib/db";
 import {
   createGroup,
   createLocation,
@@ -69,6 +70,8 @@ export interface VaultState {
   dirty: boolean;
   error: string | null;
   ownerHandle: string | null;
+  /** Whether anyone with the link can read this vault. Gists always are; null until known. */
+  isPublic: boolean | null;
   isHistoricalVersion: boolean;
   historicalVersionId: string | null;
   latestVersion: string | null;
@@ -123,6 +126,8 @@ export interface VaultActions {
   flushPendingSave: () => Promise<void>;
   /** Re-attempts a save after a failure, skipping the debounce. */
   retrySave: () => Promise<void>;
+  /** Hosted only: lets anyone with the link read the vault. */
+  setPublic: (isPublic: boolean) => Promise<void>;
 }
 
 export type VaultEvent = { type: "toast"; message: string; variant?: ToastVariant };
@@ -141,6 +146,7 @@ const INITIAL_STATE: VaultState = {
   dirty: false,
   error: null,
   ownerHandle: null,
+  isPublic: null,
   isHistoricalVersion: false,
   historicalVersionId: null,
   latestVersion: null,
@@ -259,9 +265,18 @@ function adoptSnapshot(snapshot: DatastoreSnapshot, extra: Partial<VaultState> =
     uri: snapshot.uri,
     version: snapshot.version,
     source: snapshot.source,
+    isPublic: snapshot.isPublic ?? (snapshot.uri.startsWith("gist:") ? true : null),
     ...extra,
   });
   return vault;
+}
+
+async function setPublic(isPublic: boolean): Promise<void> {
+  const { uri } = state;
+  if (!uri) return;
+  const { version } = await setDatastorePublic(uri, isPublic);
+  if (state.uri !== uri) return;
+  setState({ isPublic, version });
 }
 
 // ─── Saving ──────────────────────────────────────────────────────────────────
@@ -973,4 +988,5 @@ export const vaultActions: VaultActions = {
   revertToVersion,
   flushPendingSave,
   retrySave,
+  setPublic,
 };

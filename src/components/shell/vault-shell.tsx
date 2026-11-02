@@ -14,6 +14,7 @@ import { ReadOnlyBanner } from "@/components/ui/read-only-banner";
 import { LogoMark } from "@/components/logo-mark";
 import { useTheme } from "@/components/theme-provider";
 import { formatLastSeen } from "@/lib/datastore/helpers";
+import { getProviderFromUri } from "@/lib/datastore/uri";
 import { getAllPeople, useVault } from "@/lib/vault-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
@@ -209,6 +210,7 @@ function VaultChrome({ route, children }: VaultShellProps) {
       {/* Read-only banner */}
       {isReadOnly && !isHistoricalVersion && (
         <ReadOnlyBanner
+          provider={getProviderFromUri(uri)}
           onClone={() => {
             if (!isAuthenticated) {
               navigate(routes.connect(href(route)));
