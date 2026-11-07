@@ -1,7 +1,7 @@
 name: Deploy PocketBase
 
 # Pushes the committed migrations and hooks to the PocketHost instance named in
-# .phioconfig whenever they change on main, using PocketHost's phio CLI over
+# pocketbase/.phioconfig whenever they change on main, using PocketHost's phio CLI over
 # SFTP. Hooks reload live; migrations apply on the instance's next start, so the
 # job ends by waking the instance and reminding you to power-cycle it from the
 # PocketHost dashboard when a migration shipped.
@@ -21,7 +21,7 @@ on:
     paths:
       - "pocketbase/pb_migrations/**"
       - "pocketbase/pb_hooks/**"
-      - ".phioconfig"
+      - "pocketbase/.phioconfig"
   workflow_dispatch:
 
 concurrency:

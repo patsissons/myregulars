@@ -103,7 +103,7 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
    [phio](https://pockethost.io/blog/phio-sftp-deploy), PocketHost's SFTP deploy CLI (SFTP on
    `ftp.pockethost.io:2222` with an Ed25519 key; the old FTPS/21 access is being retired):
    ```
-   npm run pb:deploy       # pushes pb_migrations + pb_hooks (instance from .phioconfig)
+   npm run pb:deploy       # pushes pb_migrations + pb_hooks (instance from pocketbase/.phioconfig)
    # signs in with PB_SUPERUSER_EMAIL / PB_SUPERUSER_PASSWORD from .env.local and
    # registers a deploy key under Account → Keys on first use
    ```

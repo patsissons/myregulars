@@ -36,5 +36,8 @@ if [ -z "$PHIO_USERNAME" ] || [ -z "$PHIO_PASSWORD" ]; then
   exit 1
 fi
 
+# phio syncs `pb_*` (and package.json) from the directory that holds
+# .phioconfig; this repo keeps PocketBase under pocketbase/, so root it there.
+export PHIO_PROJECT_DIR="$ROOT_DIR/pocketbase"
 cd "$ROOT_DIR"
 exec npx phio "$@"

@@ -96,7 +96,7 @@ the repository's `production` environment:
 your `.env.local` with the `gh` CLI.
 
 **PocketBase (PocketHost).** `.github/workflows/deploy-pocketbase.yml` pushes
-`pocketbase/pb_migrations` and `pb_hooks` to the instance named in the committed `.phioconfig`
+`pocketbase/pb_migrations` and `pb_hooks` to the instance named in the committed `pocketbase/.phioconfig`
 whenever they change on `main`, using [phio](https://pockethost.io/blog/phio-sftp-deploy),
 PocketHost's SFTP deploy CLI, signed in with the `PB_SUPERUSER_*` secrets. From your machine
 `npm run pb:deploy` does the same, reading the pair from `.env.local`. Hooks reload live; **migrations run on the instance's next start**, so
