@@ -13,14 +13,33 @@ gitignored.
 
 ## Data model
 
-| Collection        | Purpose                                                              |
-| ----------------- | -------------------------------------------------------------------- |
-| `users`           | PocketBase auth collection; social logins enabled (see below).       |
-| `vaults`          | One record per vault: `owner`, `name`, `document` (the vault JSON).  |
-| `vault_snapshots` | Append-only history: `vault`, `owner`, `document`. One row per save. |
+| Collection        | Purpose                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `users`           | PocketBase auth collection; social logins enabled (see below).                                              |
+| `vaults`          | One record per vault: `owner`, `name`, `public`, `document` (the vault JSON).                               |
+| `vault_snapshots` | Append-only history written by the server: `vault`, `owner`, `document`, `vault_updated`. One row per save. |
 
-The `vaults.updated` autodate field is the optimistic-concurrency version token. All collections are
-owner-scoped via API rules (`owner = @request.auth.id`); snapshots are immutable to users.
+The `vaults.updated` autodate field is the optimistic-concurrency version token. Vaults are
+owner-scoped via API rules (`owner = @request.auth.id`), except that a vault with `public = true` can
+be **viewed** (not listed, not edited) by anyone with its id, which is how share links work for
+hosted vaults. Snapshot reads follow the same visibility; snapshots are never writable by clients.
+
+`pb_hooks/vaults.pb.js` enforces the write semantics the app relies on:
+
+- **Conditional updates.** A vault update that carries `expectedUpdated` is rejected with `409`
+  unless it equals the record's current `updated`. The client sends the version it last read, so
+  "read, compare, write" is atomic.
+- **Server-side snapshots.** Every create, and every update that changes `document`, appends a
+  `vault_snapshots` row after the save (recording the vault's new `updated` in `vault_updated`).
+  Toggling `public` alone does not snapshot.
+
+> Deploy order matters for existing instances: apply `pb_migrations` and `pb_hooks` **before** the
+> web app build that stops writing snapshots itself, or history will have a gap. After deploying,
+> `scripts/pocketbase-smoke.sh https://your-app.pockethost.io` verifies the rules and hooks end to
+> end (it signs up a throwaway user, so run it against instances where sign-up is allowed).
+
+> Hook handlers run in pooled JS VMs and cannot reference functions defined at the top of the hook
+> file; shared code lives in `pb_hooks/vaults-utils.js` and is `require`d inside each handler.
 
 > Migrations target the PocketBase JSVM API (v0.23+, `app`/`fields`) and are verified against
 > v0.39.4. If you run an older release, regenerate them from the Admin UI.

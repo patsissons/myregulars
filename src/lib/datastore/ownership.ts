@@ -10,6 +10,15 @@ export interface VaultOwnership {
   isReadOnly: boolean;
 }
 
+export interface OwnershipContext {
+  /**
+   * Hosted only: the record's owner id from the last read. When known, the
+   * vault is writable only by that account (public vaults are readable by
+   * anyone). When unknown, a signed-in account is assumed to own what it read.
+   */
+  ownerId?: string | null;
+}
+
 /** The auth token used to write to a vault, resolved by provider. */
 export function getVaultAuthToken(uri: DatastoreUri): string | null {
   return getProviderFromUri(uri) === "hosted" ? getHostedAuthToken() : getGitHubAuthToken();
@@ -17,15 +26,22 @@ export function getVaultAuthToken(uri: DatastoreUri): string | null {
 
 /**
  * Determines who owns a vault and whether the current user may edit it.
- * Gist ownership compares the gist owner against the authenticated GitHub user;
- * hosted vaults are owner-scoped server-side, so the signed-in account always
- * owns what it can read.
+ * Gist ownership compares the gist owner against the authenticated GitHub
+ * user; hosted ownership compares the record's owner against the signed-in
+ * account.
  */
-export async function resolveVaultOwnership(uri: DatastoreUri): Promise<VaultOwnership> {
+export async function resolveVaultOwnership(
+  uri: DatastoreUri,
+  context: OwnershipContext = {},
+): Promise<VaultOwnership> {
   if (getProviderFromUri(uri) === "hosted") {
     const user = getHostedUser();
 
     if (!user) {
+      return { ownerHandle: null, isReadOnly: true };
+    }
+
+    if (context.ownerId && context.ownerId !== user.id) {
       return { ownerHandle: null, isReadOnly: true };
     }
 

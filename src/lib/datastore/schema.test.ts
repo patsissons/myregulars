@@ -37,7 +37,8 @@ describe("schema", () => {
   it("accepts documents with valid locations", () => {
     const document = parseDocument({
       app: "myregulars",
-      schemaVersion: 1,
+      schemaVersion: 2,
+      id: "vault-1",
       updatedAt: "2026-04-23T12:00:00.000Z",
       data: {
         locations: [validLocation],
@@ -51,7 +52,8 @@ describe("schema", () => {
     expect(() =>
       parseDocument({
         app: "myregulars",
-        schemaVersion: 1,
+        schemaVersion: 2,
+        id: "vault-1",
         updatedAt: "2026-04-23T12:00:00.000Z",
         data: {},
       }),
@@ -62,13 +64,106 @@ describe("schema", () => {
     expect(() =>
       parseDocument({
         app: "myregulars",
-        schemaVersion: 2,
+        schemaVersion: 3,
+        id: "vault-1",
         updatedAt: "2026-04-23T12:00:00.000Z",
         data: {
           locations: [],
         },
       }),
     ).toThrow(DatastoreValidationError);
+  });
+
+  it("rejects v2 documents without an id", () => {
+    expect(() =>
+      parseDocument({
+        app: "myregulars",
+        schemaVersion: 2,
+        updatedAt: "2026-04-23T12:00:00.000Z",
+        data: { locations: [] },
+      }),
+    ).toThrow(DatastoreValidationError);
+  });
+
+  describe("legacy (v1) documents", () => {
+    const legacy = {
+      app: "myregulars",
+      schemaVersion: 1,
+      updatedAt: "2026-04-23T12:00:00.000Z",
+      data: { locations: [validLocation] },
+    };
+
+    it("are upgraded to v2 with an id derived from the source uri", () => {
+      const document = parseDocument(legacy, { uri: "gist:abc123" });
+
+      expect(document.schemaVersion).toBe(2);
+      expect(document.id).toBe("gist-abc123");
+      expect(document.data.locations).toHaveLength(1);
+      expect(document.updatedAt).toBe(legacy.updatedAt);
+    });
+
+    it("derive a hosted id the same way", () => {
+      expect(parseDocument(legacy, { uri: "hosted:rec1" }).id).toBe("hosted-rec1");
+    });
+
+    it("get a random id when the source is unknown (e.g. pasted JSON)", () => {
+      const a = parseDocument(legacy);
+      const b = parseDocument(legacy);
+      expect(a.id).toBeTruthy();
+      expect(a.id).not.toBe(b.id);
+    });
+
+    it("take a name from the gist file name when the document has none", () => {
+      const document = parseDocument(legacy, {
+        uri: "gist:abc",
+        vaultFileName: "myregulars.morning-cafe.json",
+      });
+      expect(document.name).toBe("Morning Cafe");
+    });
+
+    it("keep their own name over the file name", () => {
+      const document = parseDocument(
+        { ...legacy, name: "Mine" },
+        { uri: "gist:abc", vaultFileName: "myregulars.other.json" },
+      );
+      expect(document.name).toBe("Mine");
+    });
+
+    it("stay nameless for the legacy file name", () => {
+      const document = parseDocument(legacy, { uri: "gist:abc", vaultFileName: "myregulars.json" });
+      expect(document.name).toBeUndefined();
+    });
+
+    it("are serialized back out as v2", () => {
+      const roundTrip = JSON.parse(serializeDocument(parseDocument(legacy, { uri: "gist:abc" })));
+      expect(roundTrip.schemaVersion).toBe(2);
+      expect(roundTrip.id).toBe("gist-abc");
+    });
+  });
+
+  it("keeps replica links and sync metadata on v2 documents", () => {
+    const document = parseDocument({
+      app: "myregulars",
+      schemaVersion: 2,
+      id: "vault-1",
+      updatedAt: "2026-04-23T12:00:00.000Z",
+      replicas: { hosted: { id: "rec1" } },
+      sync: { base: "abc", at: "2026-04-23T12:00:00.000Z" },
+      data: { locations: [] },
+    });
+
+    expect(document.replicas).toEqual({ hosted: { id: "rec1" } });
+    expect(document.sync).toEqual({ base: "abc", at: "2026-04-23T12:00:00.000Z" });
+    expect(JSON.parse(serializeDocument(document)).replicas).toEqual({ hosted: { id: "rec1" } });
+  });
+
+  it("createEmptyDocument assigns a fresh id and optional name", () => {
+    const a = createEmptyDocument(new Date("2026-04-23T12:00:00.000Z"), { name: "Home" });
+    const b = createEmptyDocument();
+    expect(a.schemaVersion).toBe(2);
+    expect(a.name).toBe("Home");
+    expect(a.id).not.toBe(b.id);
+    expect(b.name).toBeUndefined();
   });
 
   it("rejects invalid JSON strings", () => {

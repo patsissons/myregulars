@@ -257,6 +257,75 @@ describe("GistStorageAdapter", () => {
 
     await expect(adapter.create()).rejects.toThrow(AuthRequiredError);
     await expect(adapter.write(createEmptyDocument())).rejects.toThrow(AuthRequiredError);
+    await expect(adapter.delete()).rejects.toThrow(AuthRequiredError);
+  });
+
+  it("forwards keepalive on writes so a flush survives the page hiding", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "abc123",
+        files: { "myregulars.json": { content: JSON.stringify(createEmptyDocument()) } },
+        history: [{ version: "sha-new", committed_at: "2026-04-23T12:00:00.000Z" }],
+      }),
+    );
+    const adapter = new GistStorageAdapter({ authToken: "token", fetchImpl: fetchMock });
+    await adapter.connect("gist:abc123");
+
+    await adapter.write(createEmptyDocument(), { keepalive: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/gists/abc123",
+      expect.objectContaining({ method: "PATCH", keepalive: true }),
+    );
+  });
+
+  it("deletes the gist", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const adapter = new GistStorageAdapter({ authToken: "token", fetchImpl: fetchMock });
+    await adapter.connect("gist:abc123");
+
+    await adapter.delete();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/gists/abc123",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("surfaces a failed delete", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const adapter = new GistStorageAdapter({ authToken: "token", fetchImpl: fetchMock });
+    await adapter.connect("gist:abc123");
+
+    await expect(adapter.delete()).rejects.toThrow("status 404");
+  });
+
+  it("upgrades a legacy v1 gist with an id from the gist and a name from the file", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "abc123",
+        files: {
+          "myregulars.morning-cafe.json": {
+            content: JSON.stringify({
+              app: "myregulars",
+              schemaVersion: 1,
+              updatedAt: "2026-04-23T12:00:00.000Z",
+              data: { locations: [] },
+            }),
+          },
+        },
+        history: [{ version: "sha-1", committed_at: "2026-04-23T12:00:00.000Z" }],
+      }),
+    );
+    const adapter = new GistStorageAdapter({ fetchImpl: fetchMock });
+    await adapter.connect("gist:abc123");
+
+    const result = await adapter.read();
+
+    expect(result.data.schemaVersion).toBe(2);
+    expect(result.data.id).toBe("gist-abc123");
+    expect(result.data.name).toBe("Morning Cafe");
+    expect(adapter.getVaultFileName()).toBe("myregulars.morning-cafe.json");
   });
 
   it("discovers myregulars vaults and uses document name over filename", async () => {

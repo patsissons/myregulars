@@ -50,6 +50,24 @@ describe("resolveVaultOwnership (hosted)", () => {
       isReadOnly: true,
     });
   });
+
+  // Public hosted vaults are readable by anyone signed in; only the owner may write.
+  it("is read-only when the record belongs to another account", async () => {
+    vi.mocked(getHostedUser).mockReturnValue({ id: "u1", name: "Ada" });
+
+    await expect(
+      resolveVaultOwnership("hosted:rec1", { ownerId: "someone-else" }),
+    ).resolves.toEqual({ ownerHandle: null, isReadOnly: true });
+  });
+
+  it("is writable when the record owner matches", async () => {
+    vi.mocked(getHostedUser).mockReturnValue({ id: "u1", name: "Ada" });
+
+    await expect(resolveVaultOwnership("hosted:rec1", { ownerId: "u1" })).resolves.toEqual({
+      ownerHandle: "Ada",
+      isReadOnly: false,
+    });
+  });
 });
 
 describe("resolveVaultOwnership (gist)", () => {
