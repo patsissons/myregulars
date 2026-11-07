@@ -9,19 +9,18 @@ interface VaultLoaderProps {
   children: React.ReactNode;
 }
 
+/**
+ * Opens the vault for this route. The store is cache-first, so a previously
+ * seen vault paints immediately and only a first-ever open shows the spinner.
+ */
 export function VaultLoader({ vaultId, children }: VaultLoaderProps) {
-  const { vault, isLoading, error, loadVault, loadVaultVersion } = useVault();
+  const { vault, isLoading, error, openVault } = useVault();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const version = params.get("version");
-
-    if (version) {
-      loadVaultVersion(vaultId, version);
-    } else {
-      loadVault(vaultId);
-    }
-  }, [vaultId, loadVault, loadVaultVersion]);
+    void openVault(vaultId, version ? { version } : undefined);
+  }, [vaultId, openVault]);
 
   if (!vault && error) {
     return (
@@ -32,21 +31,21 @@ export function VaultLoader({ vaultId, children }: VaultLoaderProps) {
         <p className="text-[14px]" style={{ color: "var(--mr-danger)" }}>
           {error}
         </p>
-        <Button variant="secondary" onClick={() => loadVault(vaultId)}>
+        <Button variant="secondary" onClick={() => void openVault(vaultId)}>
           Retry
         </Button>
       </div>
     );
   }
 
-  if (!vault || isLoading) {
+  if (!vault) {
     return (
       <div
         className="flex min-h-dvh items-center justify-center"
         style={{ background: "var(--mr-bg)" }}
       >
         <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
-          Loading vault…
+          {isLoading ? "Loading vault…" : ""}
         </span>
       </div>
     );

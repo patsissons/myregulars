@@ -1,25 +1,12 @@
 "use client";
 
-import { useCallback, useSyncExternalStore, useState } from "react";
+import { useCallback, useState } from "react";
+import { useIsMobile } from "@/lib/use-media";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 import { PersonForm } from "@/components/person-form";
 import type { Location, Person } from "@/lib/datastore/types";
 import type { PersonFormConfig } from "@/components/person-form";
-
-// External store for viewport width
-function subscribeToResize(cb: () => void): () => void {
-  window.addEventListener("resize", cb);
-  return () => window.removeEventListener("resize", cb);
-}
-
-function getIsMobile(): boolean {
-  return window.innerWidth < 1024;
-}
-
-function getIsMobileServer(): boolean {
-  return false;
-}
 
 interface PersonFormDialogProps {
   config: PersonFormConfig | null;
@@ -27,7 +14,7 @@ interface PersonFormDialogProps {
 }
 
 function PersonFormDialog({ config, onClose }: PersonFormDialogProps) {
-  const isMobile = useSyncExternalStore(subscribeToResize, getIsMobile, getIsMobileServer);
+  const isMobile = useIsMobile();
   const title = config?.mode === "add" ? "Add a person" : "Edit person";
   const open = !!config;
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useSyncExternalStore, useState } from "react";
+import { useCallback, useState } from "react";
+import { useIsMobile } from "@/lib/use-media";
 import { Check, Copy, Eye } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -9,18 +10,6 @@ import { Sheet } from "@/components/ui/sheet";
 import { buildShareUrl, getGistIdFromUri } from "@/lib/datastore/uri";
 import { useVault } from "@/lib/vault-context";
 
-// Viewport detection via external store
-function subscribeToResize(cb: () => void): () => void {
-  window.addEventListener("resize", cb);
-  return () => window.removeEventListener("resize", cb);
-}
-function getIsMobile(): boolean {
-  return window.innerWidth < 1024;
-}
-function getIsMobileServer(): boolean {
-  return false;
-}
-
 interface ShareContentProps {
   shareUrl: string;
   uri: string;
@@ -28,7 +17,7 @@ interface ShareContentProps {
 
 function ShareContent({ shareUrl, uri }: ShareContentProps) {
   const [copied, setCopied] = useState(false);
-  const isMobile = useSyncExternalStore(subscribeToResize, getIsMobile, getIsMobileServer);
+  const isMobile = useIsMobile();
 
   const qrSize = isMobile ? 168 : 140;
 
@@ -117,7 +106,7 @@ interface ShareDialogComponentProps {
 
 function ShareDialogComponent({ open, onClose }: ShareDialogComponentProps) {
   const { uri } = useVault();
-  const isMobile = useSyncExternalStore(subscribeToResize, getIsMobile, getIsMobileServer);
+  const isMobile = useIsMobile();
 
   const shareUrl = uri && typeof window !== "undefined" ? buildShareUrl(getGistIdFromUri(uri)) : "";
   const uriStr = uri ?? "";

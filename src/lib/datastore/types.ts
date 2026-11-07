@@ -124,6 +124,11 @@ export interface DatastoreSnapshot {
   ownerId?: string | null;
   /** Hosted only: whether anyone with the link may read the vault. */
   isPublic?: boolean;
+  /**
+   * What this browser last resolved about the current user's access, so a
+   * cached copy can render with the right controls before the network answers.
+   */
+  ownership?: { ownerHandle: string | null; isReadOnly: boolean };
 }
 
 export interface VersionInfo {

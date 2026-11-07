@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { ResumeWatchdog } from "@/components/resume-watchdog";
+import { VaultStoreEffects } from "@/components/vault-store-effects";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -70,7 +71,10 @@ export default function RootLayout({
         <ResumeWatchdog />
         <ThemeProvider>
           <AuthProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <VaultStoreEffects />
+              {children}
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

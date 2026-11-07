@@ -20,7 +20,8 @@ export const GITHUB_AUTH_TOKEN_KEY = "myregulars:github-auth-token";
 
 export const DATASTORE_CACHE_DB_NAME = "myregulars-datastore";
 export const DATASTORE_CACHE_STORE_NAME = "snapshots";
-export const DATASTORE_CACHE_DB_VERSION = 1;
+export const DATASTORE_OUTBOX_STORE_NAME = "outbox";
+export const DATASTORE_CACHE_DB_VERSION = 2;
 
 export const GITHUB_AUTH_COOKIE_NAME = "myregulars-github-oauth-state";
 export const GITHUB_AUTH_MESSAGE_TYPE = "myregulars:github-oauth";

@@ -10,6 +10,8 @@ import {
   getPeopleCount,
 } from "@/lib/vault-context";
 import { ToastProvider } from "@/components/ui/toast";
+import { VaultStoreEffects } from "@/components/vault-store-effects";
+import { resetVaultStore } from "@/lib/vault-store";
 import {
   createDatastore,
   loadDatastore,
@@ -39,6 +41,11 @@ vi.mock("@/lib/db", () => ({
   loadDatastoreVersion: vi.fn(),
   saveDatastore: vi.fn(),
   syncDatastoreReplicas: vi.fn(),
+  readCachedDatastore: vi.fn(async () => null),
+  readOutbox: vi.fn(async () => null),
+  writeOutbox: vi.fn(async () => {}),
+  clearOutbox: vi.fn(async () => {}),
+  rememberVaultOwnership: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/datastore/auth", () => ({
@@ -182,6 +189,7 @@ async function renderLoaded(document: MyRegularsDocument = fixtureDocument()): P
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetVaultStore();
   localStorage.clear();
   vi.useFakeTimers();
   vi.setSystemTime(new Date(NOW));
@@ -281,10 +289,10 @@ describe("findPerson", () => {
 // ---------------------------------------------------------------------------
 
 describe("useVault", () => {
-  it("throws when used outside of a provider", () => {
-    expect(() => renderHook(() => useVault())).toThrow(
-      "useVault must be used inside VaultProvider",
-    );
+  it("works without a provider (the store lives at module level)", () => {
+    const { result } = renderHook(() => useVault());
+    expect(result.current.vault).toBeNull();
+    expect(typeof result.current.openVault).toBe("function");
   });
 });
 
@@ -768,6 +776,7 @@ describe("debounced sync", () => {
     const { result } = renderHook(() => useVault(), {
       wrapper: ({ children }) => (
         <ToastProvider>
+          <VaultStoreEffects />
           <VaultProvider>{children}</VaultProvider>
         </ToastProvider>
       ),

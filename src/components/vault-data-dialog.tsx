@@ -1,23 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useIsMobile } from "@/lib/use-media";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 import { createEmptyDocument } from "@/lib/datastore/schema";
 import { useVault } from "@/lib/vault-context";
-
-function subscribeToResize(cb: () => void): () => void {
-  window.addEventListener("resize", cb);
-  return () => window.removeEventListener("resize", cb);
-}
-function getIsMobile(): boolean {
-  return window.innerWidth < 1024;
-}
-function getIsMobileServer(): boolean {
-  return false;
-}
 
 /**
  * Lightweight JSON syntax highlighter.
@@ -147,7 +137,7 @@ interface VaultDataDialogComponentProps {
 
 function VaultDataDialogComponent({ open, onClose }: VaultDataDialogComponentProps) {
   const { vault } = useVault();
-  const isMobile = useSyncExternalStore(subscribeToResize, getIsMobile, getIsMobileServer);
+  const isMobile = useIsMobile();
 
   const json = useMemo(() => {
     if (!vault) return "";
