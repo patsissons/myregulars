@@ -25,14 +25,16 @@ test.describe("add-person sheet (issues 10, 11)", () => {
       )
       .toBe("Name");
 
-    // The name field is within the viewport (not scrolled past).
-    const box = await nameInput.boundingBox();
+    // The name field is within the viewport (not scrolled past). Poll: the
+    // sheet is still sliding in when focus lands.
     const viewport = page.viewportSize();
-    expect(box).not.toBeNull();
-    if (box && viewport) {
-      expect(box.y).toBeGreaterThanOrEqual(0);
-      expect(box.y).toBeLessThanOrEqual(viewport.height);
-    }
+    expect(viewport).not.toBeNull();
+    await expect
+      .poll(async () => {
+        const box = await nameInput.boundingBox();
+        return box ? box.y >= 0 && box.y + box.height <= (viewport?.height ?? 0) : false;
+      })
+      .toBe(true);
   });
 
   test("the sheet body is a scroll container sized to the dynamic viewport (issue 10)", async ({
