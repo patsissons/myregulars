@@ -56,15 +56,16 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with your GitHub
 
 ## Scripts
 
-| Command                       | Purpose                                       |
-| ----------------------------- | --------------------------------------------- |
-| `npm run dev`                 | Start development server                      |
-| `npm run build`               | Production build                              |
-| `npm run format-and-validate` | Format, typecheck, lint, and test in one pass |
-| `npm test`                    | Run unit/component tests (Vitest)             |
-| `npm run test:e2e`            | Run end-to-end tests (Playwright)             |
-| `npm run cf:preview`          | Build and run the Cloudflare Worker locally   |
-| `npm run cf:deploy`           | Build and deploy the Cloudflare Worker        |
+| Command                       | Purpose                                        |
+| ----------------------------- | ---------------------------------------------- |
+| `npm run dev`                 | Start development server                       |
+| `npm run build`               | Production build                               |
+| `npm run format-and-validate` | Format, typecheck, lint, and test in one pass  |
+| `npm test`                    | Run unit/component tests (Vitest)              |
+| `npm run test:e2e`            | Run end-to-end tests (Playwright)              |
+| `npm run cf:preview`          | Build and run the Cloudflare Worker locally    |
+| `npm run cf:deploy`           | Build and deploy the Cloudflare Worker         |
+| `npm run pb:deploy`           | Push PocketBase migrations/hooks to PocketHost |
 
 ## Deployment
 
@@ -82,23 +83,37 @@ PocketBase instance on PocketHost (see `pocketbase/README.md`).
 **Automatic deploys.** `.github/workflows/deploy.yml` deploys `main` on every push. It needs, on
 the repository's `production` environment:
 
-- secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`;
-- secrets `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (the Gist OAuth app). The
-  workflow pushes them to the Worker as runtime secrets on each deploy;
+- secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`. The same two
+  in `.env.local` let `npm run cf:deploy` work from your machine, since wrangler reads `.env*`;
+- secrets `GIST_OAUTH_CLIENT_ID` / `GIST_OAUTH_CLIENT_SECRET`: the values of `GITHUB_OAUTH_*` from
+  `.env.local` (GitHub refuses secret names that start with `GITHUB_`). The workflow pushes them to
+  the Worker as `GITHUB_OAUTH_*` runtime secrets on each deploy;
+- secrets `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`: your PocketHost login, used by the
+  PocketBase deploy workflow below;
 - variable `NEXT_PUBLIC_POCKETBASE_URL` (inlined into the client bundle at build time).
 
-`.github/workflows/deploy-pocketbase.yml` uploads `pocketbase/pb_migrations` and `pb_hooks` to
-PocketHost over FTP when they change; see `pocketbase/README.md` for its secrets and the
-power-cycle note.
+`scripts/github-secrets.sh` creates the `production` environment and sets all of the above from
+your `.env.local` with the `gh` CLI.
+
+**PocketBase (PocketHost).** `.github/workflows/deploy-pocketbase.yml` pushes
+`pocketbase/pb_migrations` and `pb_hooks` to the instance named in the committed `pocketbase/.phioconfig`
+whenever they change on `main`, using [phio](https://pockethost.io/blog/phio-sftp-deploy),
+PocketHost's SFTP deploy CLI, signed in with the `PB_SUPERUSER_*` secrets. From your machine
+`npm run pb:deploy` does the same, reading the pair from `.env.local`. Hooks reload live; **migrations run on the instance's next start**, so
+power-cycle it from the PocketHost dashboard after a migration ships. See `pocketbase/README.md`.
 
 **Local preview.** Put the two `GITHUB_OAUTH_*` values in `.dev.vars` (gitignored) and run
 `npm run cf:preview`; the Worker serves on `http://localhost:8787`. The GitHub OAuth app's callback
 URL must match the origin you are testing (`<origin>/api/auth/github/callback`), so production
 uses its own OAuth app pointed at the Worker's domain.
 
-**Custom domain.** Attach `myregulars.app` to the Worker as a custom domain in the Cloudflare
-dashboard once its DNS is on Cloudflare; until then the `*.workers.dev` URL is the app's origin and
-must be the one registered on the GitHub OAuth app.
+**Custom domain.** `myregulars.app` already resolves through Cloudflare, so the cutover is:
+deploy the Worker, remove the apex's DNS-only A records that still point at Vercel, and attach the
+hostname to the Worker as a custom domain (Cloudflare then manages its records and certificate).
+`scripts/cloudflare-cutover.sh` does the last two steps through the API (dry run by default,
+`--apply` to execute; `HOSTNAMES="myregulars.app www.myregulars.app"` to include `www`). The Gist
+OAuth app's callback stays `https://myregulars.app/api/auth/github/callback`, so it needs no change;
+on a bare `*.workers.dev` URL the GitHub sign-in will fail its redirect check, which is expected.
 
 ## Project structure
 

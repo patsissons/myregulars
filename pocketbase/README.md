@@ -99,16 +99,28 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
 **On PocketHost (the PocketBase instance):**
 
 1. Create an instance; note its URL (e.g. `https://your-app.pockethost.io`).
-2. Deploy `pocketbase/pb_migrations` and `pocketbase/pb_hooks` to it (PocketHost supports both), so
-   the collections are created and the OAuth2 bootstrap hook runs. The
-   `.github/workflows/deploy-pocketbase.yml` workflow does this over FTP on every push to `main`
-   that touches those folders; it needs the `POCKETHOST_FTP_USER` / `POCKETHOST_FTP_PASSWORD`
-   secrets and the `POCKETHOST_INSTANCE` (instance subdomain) and `NEXT_PUBLIC_POCKETBASE_URL`
-   variables on the `production` environment. Hooks reload live; **migrations run on the next
-   start**, so power-cycle the instance from the PocketHost dashboard after a migration ships.
-   The first deploy of this repo's current migrations must happen **before** the web app that
-   relies on them (server-written snapshots, `vaults.public`).
-3. Set the OAuth2 secrets as **instance environment variables** — the hook reads them on boot:
+2. Deploy `pocketbase/pb_migrations` and `pocketbase/pb_hooks` to it with
+   [phio](https://pockethost.io/blog/phio-sftp-deploy), PocketHost's SFTP deploy CLI (SFTP on
+   `ftp.pockethost.io:2222` with an Ed25519 key; the old FTPS/21 access is being retired):
+   ```
+   npm run pb:deploy       # pushes pb_migrations + pb_hooks (instance from pocketbase/.phioconfig)
+   # signs in with PB_SUPERUSER_EMAIL / PB_SUPERUSER_PASSWORD from .env.local and
+   # registers a deploy key under Account → Keys on first use
+   ```
+   `.github/workflows/deploy-pocketbase.yml` runs the same `phio deploy` on every push to `main`
+   that touches these folders, signed in with the `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`
+   secrets of the `production` environment (your PocketHost login; the same pair `.env.local` holds,
+   so `scripts/github-secrets.sh` can copy it up). Optionally add `PHIO_DEPLOY_KEY` (the private key
+   phio created when you ran `npx phio login`; `npx phio info` prints its directory) so CI reuses
+   one registered key instead of adding a new one under Account → Keys on every run.
+   Hooks reload live. **Migrations only run when the instance starts**, so power-cycle it from the
+   PocketHost dashboard after deploying a migration. This repo's current migrations must be live
+   **before** the web app that relies on them (server-written snapshots, `vaults.public`).
+   `npm run pb:dev` runs phio's watch mode while editing hooks.
+3. Set the OAuth2 secrets as **instance environment variables** on PocketHost (not as GitHub
+   secrets) — the hook reads them on boot. `PB_OAUTH2_GITHUB_*` is a **different** GitHub OAuth app
+   from the web app's `GITHUB_OAUTH_*` (Gist provider): a GitHub OAuth app allows one callback URL,
+   and this one's callback is the instance's `/api/oauth2-redirect`.
    ```
    PB_OAUTH2_GITHUB_CLIENT_ID=...
    PB_OAUTH2_GITHUB_CLIENT_SECRET=...
@@ -121,8 +133,9 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
 4. Set the build-time variable on the GitHub `production` environment and deploy (it is inlined
    into the client bundle by `npm run cf:build`):
    ```
-   NEXT_PUBLIC_POCKETBASE_URL=https://your-app.pockethost.io
+   NEXT_PUBLIC_POCKETBASE_URL=https://myregulars.pockethost.io
    ```
+   This is the PocketBase instance's URL, not the web app's domain.
    No trailing slash. The `PB_*` vars are **not** used by the web app — they belong on PocketHost.
    See the root README's Deployment section for the Worker secrets.
 

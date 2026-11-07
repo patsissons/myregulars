@@ -57,3 +57,9 @@ bin/athanor
 /pocketbase/pocketbase
 /pocketbase/pb_data/
 /pocketbase/*.zip
+
+# phio (PocketHost SFTP deploy) incremental sync state
+.ftp-deploy-sync-state.json
+
+# editor swap files
+*.swp
