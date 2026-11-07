@@ -35,8 +35,15 @@ yarn-error.log*
 # local env files (can opt-in for committing if needed)
 .env*.local
 
-# vercel
+# vercel (legacy)
 .vercel
+
+# cloudflare (OpenNext build output, wrangler state, local secrets, generated types)
+/.open-next/
+/.wrangler/
+.dev.vars
+.dev.vars.*
+cloudflare-env.d.ts
 
 # typescript
 *.tsbuildinfo

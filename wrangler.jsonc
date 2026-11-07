@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "myregulars",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  // Secrets (not vars): GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET.
+  //   npx wrangler secret put GITHUB_OAUTH_CLIENT_ID
+  // NEXT_PUBLIC_POCKETBASE_URL is inlined at build time (see .env / CI).
+  // No R2 / KV: the app has no ISR or `use cache`, so the default in-memory
+  // incremental cache is enough. The custom domain is attached as a Workers
+  // route in the Cloudflare dashboard once DNS is on Cloudflare.
+}
