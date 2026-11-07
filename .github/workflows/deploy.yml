@@ -42,5 +42,7 @@ jobs:
             GITHUB_OAUTH_CLIENT_ID
             GITHUB_OAUTH_CLIENT_SECRET
         env:
-          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GITHUB_OAUTH_CLIENT_ID }}
-          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GITHUB_OAUTH_CLIENT_SECRET }}
+          # GitHub rejects secret names starting with GITHUB_, so the repository
+          # secrets are GIST_OAUTH_*; the Worker still sees GITHUB_OAUTH_*.
+          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GIST_OAUTH_CLIENT_ID }}
+          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GIST_OAUTH_CLIENT_SECRET }}

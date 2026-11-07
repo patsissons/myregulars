@@ -103,12 +103,14 @@ Each key prefix expands to `_CLIENT_ID` and `_CLIENT_SECRET`. For each provider,
    [phio](https://pockethost.io/blog/phio-sftp-deploy), PocketHost's SFTP deploy CLI (SFTP on
    `ftp.pockethost.io:2222` with an Ed25519 key; the old FTPS/21 access is being retired):
    ```
-   npx phio login          # once; registers a key under Account → Keys
    npm run pb:deploy       # pushes pb_migrations + pb_hooks (instance from .phioconfig)
+   # signs in with PB_SUPERUSER_EMAIL / PB_SUPERUSER_PASSWORD from .env.local and
+   # registers a deploy key under Account → Keys on first use
    ```
    `.github/workflows/deploy-pocketbase.yml` runs the same `phio deploy` on every push to `main`
-   that touches these folders, with the account login in the `PHIO_USERNAME` / `PHIO_PASSWORD`
-   secrets of the `production` environment. Optionally add `PHIO_DEPLOY_KEY` (the private key
+   that touches these folders, signed in with the `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`
+   secrets of the `production` environment (your PocketHost login; the same pair `.env.local` holds,
+   so `scripts/github-secrets.sh` can copy it up). Optionally add `PHIO_DEPLOY_KEY` (the private key
    phio created when you ran `npx phio login`; `npx phio info` prints its directory) so CI reuses
    one registered key instead of adding a new one under Account → Keys on every run.
    Hooks reload live. **Migrations only run when the instance starts**, so power-cycle it from the

@@ -21,8 +21,8 @@
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf:typegen": "wrangler types",
-    "pb:deploy": "phio deploy",
-    "pb:dev": "phio dev"
+    "pb:deploy": "scripts/phio.sh deploy",
+    "pb:dev": "scripts/phio.sh dev"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

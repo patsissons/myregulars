@@ -85,16 +85,21 @@ the repository's `production` environment:
 
 - secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`. The same two
   in `.env.local` let `npm run cf:deploy` work from your machine, since wrangler reads `.env*`;
-- secrets `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (the Gist OAuth app). The
-  workflow pushes them to the Worker as runtime secrets on each deploy;
+- secrets `GIST_OAUTH_CLIENT_ID` / `GIST_OAUTH_CLIENT_SECRET`: the values of `GITHUB_OAUTH_*` from
+  `.env.local` (GitHub refuses secret names that start with `GITHUB_`). The workflow pushes them to
+  the Worker as `GITHUB_OAUTH_*` runtime secrets on each deploy;
+- secrets `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`: your PocketHost login, used by the
+  PocketBase deploy workflow below;
 - variable `NEXT_PUBLIC_POCKETBASE_URL` (inlined into the client bundle at build time).
+
+`scripts/github-secrets.sh` creates the `production` environment and sets all of the above from
+your `.env.local` with the `gh` CLI.
 
 **PocketBase (PocketHost).** `.github/workflows/deploy-pocketbase.yml` pushes
 `pocketbase/pb_migrations` and `pb_hooks` to the instance named in the committed `.phioconfig`
 whenever they change on `main`, using [phio](https://pockethost.io/blog/phio-sftp-deploy),
-PocketHost's SFTP deploy CLI. It needs `PHIO_USERNAME` / `PHIO_PASSWORD` (your PocketHost login)
-as `production` secrets. The same thing from your machine: `npx phio login` once, then
-`npm run pb:deploy`. Hooks reload live; **migrations run on the instance's next start**, so
+PocketHost's SFTP deploy CLI, signed in with the `PB_SUPERUSER_*` secrets. From your machine
+`npm run pb:deploy` does the same, reading the pair from `.env.local`. Hooks reload live; **migrations run on the instance's next start**, so
 power-cycle it from the PocketHost dashboard after a migration ships. See `pocketbase/README.md`.
 
 **Local preview.** Put the two `GITHUB_OAUTH_*` values in `.dev.vars` (gitignored) and run
