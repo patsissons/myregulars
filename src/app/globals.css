@@ -9,6 +9,9 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Touch devices: controls grow to a 44px target under this variant. */
+@custom-variant coarse (@media (pointer: coarse));
+
 /* ─── Design tokens — light theme ─── */
 :root {
   color-scheme: light;
@@ -106,6 +109,22 @@
 @utility safe-x {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* A 44px hit area on touch devices without changing the visual size: the
+   pseudo-element extends the clickable box around a small control. */
+@utility touch-target {
+  position: relative;
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 50%;
+      min-width: 44px;
+      min-height: 44px;
+      transform: translate(-50%, -50%);
+    }
+  }
 }
 
 /* ─── Global base styles ─── */

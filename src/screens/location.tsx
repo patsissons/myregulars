@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, MoreHorizontal, Plus, Search, X } from "lucide-react";
+import { MoreHorizontal, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { PersonRow } from "@/components/ui/person-row";
+import { PageHeader } from "@/components/shell/page-header";
+import type { Person } from "@/lib/datastore/types";
 import { LocationDetailContent } from "@/components/location-detail-content";
 import { EmptyState } from "@/components/empty-state";
 import { usePersonFormDialog } from "@/components/person-form-dialog";
@@ -80,7 +83,8 @@ export function LocationScreen({ route }: LocationScreenProps) {
 }
 
 function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPerson: () => void }) {
-  const { vault, isReadOnly, logVisit, updateLocation, deleteLocation, deleteGroup } = useVault();
+  const { vault, isReadOnly, logVisit, updatePerson, updateLocation, deleteLocation, deleteGroup } =
+    useVault();
   const { showToast } = useToast();
   const { uri, locationId, version } = route;
 
@@ -125,7 +129,19 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
     if (activeGroupId === groupId) setActiveGroupId(null);
   }
 
-  function handleRenamePlace() {
+  function handleSwipeLog(groupId: string, person: Person) {
+    const before = { lastSeen: person.lastSeen, visitLog: person.visitLog };
+    logVisit(locationId, groupId, person.id);
+    showToast(`Logged a visit for ${person.name}`, {
+      action: {
+        label: "Undo",
+        onClick: () => updatePerson(locationId, groupId, person.id, before),
+      },
+    });
+  }
+
+  function handleRenamePlace(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!renameValue.trim()) return;
     updateLocation(locationId, { name: renameValue.trim() });
     setShowRenameModal(false);
@@ -148,47 +164,31 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
           paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
         }}
       >
-        {/* Mobile header */}
-        <div
-          className="safe-top flex items-center justify-between px-4 pt-4 pb-3"
-          style={{ borderBottom: "1px solid var(--mr-edge)" }}
-        >
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-            aria-label="Back"
-          >
-            <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
-          </button>
-          {!isReadOnly && (
-            <DropdownMenu
-              items={[
-                {
-                  label: "Rename place",
-                  onClick: () => {
-                    setRenameValue(location.name);
-                    setShowRenameModal(true);
+        <PageHeader
+          onBack={goBack}
+          right={
+            !isReadOnly && (
+              <DropdownMenu
+                title={location.name}
+                items={[
+                  {
+                    label: "Rename place",
+                    onClick: () => {
+                      setRenameValue(location.name);
+                      setShowRenameModal(true);
+                    },
                   },
-                },
-                {
-                  label: "Delete place",
-                  onClick: () => setShowDeleteConfirm(true),
-                  destructive: true,
-                },
-              ]}
-              trigger={
-                <button
-                  type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-                  aria-label="More options"
-                >
-                  <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
-                </button>
-              }
-            />
-          )}
-        </div>
+                  {
+                    label: "Delete place",
+                    onClick: () => setShowDeleteConfirm(true),
+                    destructive: true,
+                  },
+                ]}
+                trigger={<IconButton icon={MoreHorizontal} label="More options" />}
+              />
+            )
+          }
+        />
 
         {/* Location info */}
         <div className="px-5 pt-5 pb-4">
@@ -297,7 +297,7 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
                         person={person}
                         isReadOnly={isReadOnly}
                         onClick={() => navigate(routes.person(uri, locationId, person.id, version))}
-                        onLog={() => logVisit(locationId, group.id, person.id)}
+                        onLog={() => handleSwipeLog(group.id, person)}
                       />
                     ))}
                   </div>
@@ -311,6 +311,7 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
         {!isReadOnly && (
           <button
             type="button"
+            data-fab
             onClick={onAddPerson}
             className="fixed flex items-center gap-2 text-[14px] font-[500] transition-all hover:brightness-110 active:opacity-70 dark:hover:brightness-90"
             style={{
@@ -331,43 +332,52 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
         )}
       </div>
 
-      {/* Rename Place Modal */}
-      <Modal
+      {/* Rename Place */}
+      <ResponsiveDialog
         open={showRenameModal}
         onOpenChange={(open) => {
           setShowRenameModal(open);
           if (!open) setRenameValue("");
         }}
         title="Rename place"
+        historyId="rename-place"
+        action={{ label: "Rename", form: "rename-place-form", disabled: !renameValue.trim() }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="rename-place-form"
+              variant="primary"
+              disabled={!renameValue.trim()}
+            >
+              Rename
+            </Button>
+          </div>
+        }
       >
-        <div className="flex flex-col gap-4 p-5">
+        <form id="rename-place-form" onSubmit={handleRenamePlace} className="p-5">
           <Input
             placeholder="Place name"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRenamePlace()}
+            autoCapitalize="words"
+            enterKeyHint="done"
             autoFocus
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleRenamePlace} disabled={!renameValue.trim()}>
-              Rename
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </form>
+      </ResponsiveDialog>
 
-      {/* Delete Place Confirmation Modal */}
-      <Modal open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm} title="Delete place">
-        <div className="flex flex-col gap-4 p-5">
-          <p className="text-[13px]" style={{ color: "var(--mr-dim)" }}>
-            This will permanently delete{" "}
-            <strong style={{ color: "var(--mr-text)" }}>{location.name}</strong> and all its people.
-            This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
+      {/* Delete Place Confirmation */}
+      <ResponsiveDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete place"
+        action={{ label: "Delete", onClick: handleDeletePlace }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
             <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
               Cancel
             </Button>
@@ -375,8 +385,14 @@ function MobileLocation({ route, onAddPerson }: LocationScreenProps & { onAddPer
               Delete
             </Button>
           </div>
-        </div>
-      </Modal>
+        }
+      >
+        <p className="p-5 text-[14px] leading-relaxed" style={{ color: "var(--mr-dim)" }}>
+          This will permanently delete{" "}
+          <strong style={{ color: "var(--mr-text)" }}>{location.name}</strong> and all its people.
+          This cannot be undone.
+        </p>
+      </ResponsiveDialog>
     </>
   );
 }

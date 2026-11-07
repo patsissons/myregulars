@@ -1,19 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Plus, Share2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { SyncChip } from "@/components/ui/sync-chip";
+import { PageHeader } from "@/components/shell/page-header";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { getAllPeople, useVault } from "@/lib/vault-context";
 import { VaultSearch } from "@/components/vault-search";
+import { useNewPlaceDialog } from "@/components/new-place-dialog";
+import { useShareDialog } from "@/components/share-dialog";
 import { useVaultDataDialog } from "@/components/vault-data-dialog";
 import { useVersionHistoryDialog } from "@/components/version-history-dialog";
-import { useDuplicateConfirm } from "@/components/duplicate-confirm-dialog";
 import { goBack, navigate } from "@/lib/router/history";
 import { routes, type Route } from "@/lib/router/routes";
 import { useIsMobile } from "@/lib/use-media";
@@ -106,18 +110,20 @@ function DesktopVaultOverview({ route }: VaultHomeScreenProps) {
 }
 
 function MobileVaultHome({ route }: VaultHomeScreenProps) {
-  const { vault, isReadOnly, addLocation, updateVaultName } = useVault();
+  const { vault, isReadOnly, updateVaultName } = useVault();
   const { uri, version } = route;
+  const { openShare, ShareDialogComponent } = useShareDialog();
   const { openVaultData, VaultDataDialogComponent } = useVaultDataDialog();
   const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog(uri);
-  const { checkDuplicate, DuplicateConfirmDialogComponent } = useDuplicateConfirm();
+  const { openNewPlace, NewPlaceDialogComponent } = useNewPlaceDialog();
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
   const peopleCount =
     vault?.locations.flatMap((l) => l.groups.flatMap((g) => g.people)).length ?? 0;
 
-  function handleRename() {
+  function handleRename(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!renameValue.trim()) return;
     updateVaultName(renameValue.trim());
     setShowRenameModal(false);
@@ -133,43 +139,36 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
         paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
       }}
     >
-      {/* Mobile header */}
-      <div
-        className="safe-top flex items-center justify-between px-4 pt-4 pb-3"
-        style={{ borderBottom: "1px solid var(--mr-edge)" }}
-      >
-        <button
-          type="button"
-          onClick={goBack}
-          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-          aria-label="Back to vaults"
-        >
-          <ChevronLeft size={18} style={{ color: "var(--mr-dim)" }} />
-        </button>
-        <DropdownMenu
-          items={[
-            {
-              label: "Rename vault",
-              onClick: () => {
-                setRenameValue(vault?.name ?? "");
-                setShowRenameModal(true);
-              },
-            },
-            { label: "View vault data", onClick: openVaultData },
-            { label: "Version history", onClick: openVersionHistory },
-            { label: "Close vault", onClick: () => navigate(routes.vaults()) },
-          ]}
-          trigger={
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
-              aria-label="More options"
-            >
-              <MoreHorizontal size={18} style={{ color: "var(--mr-dim)" }} />
-            </button>
-          }
-        />
-      </div>
+      <PageHeader
+        onBack={goBack}
+        backLabel="Back to vaults"
+        right={
+          <>
+            <SyncChip compact className="mr-1" />
+            <IconButton icon={Share2} label="Share vault" onClick={openShare} />
+            <DropdownMenu
+              title={vault?.name}
+              items={[
+                ...(isReadOnly
+                  ? []
+                  : [
+                      {
+                        label: "Rename vault",
+                        onClick: () => {
+                          setRenameValue(vault?.name ?? "");
+                          setShowRenameModal(true);
+                        },
+                      },
+                    ]),
+                { label: "View vault data", onClick: openVaultData },
+                { label: "Version history", onClick: openVersionHistory },
+                { label: "Close vault", onClick: () => navigate(routes.vaults()) },
+              ]}
+              trigger={<IconButton icon={MoreHorizontal} label="More options" />}
+            />
+          </>
+        }
+      />
 
       <div className="px-5 pt-5 pb-6">
         <Eyebrow className="mb-2 block">Vault</Eyebrow>
@@ -211,7 +210,7 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
                     key={location.id}
                     type="button"
                     onClick={() => navigate(routes.location(uri, location.id, version))}
-                    className="flex w-full items-center gap-3 px-4 py-[14px] text-left transition-colors hover:bg-black/[0.04] active:opacity-70 dark:hover:bg-white/[0.05]"
+                    className="flex min-h-[56px] w-full items-center gap-3 px-4 py-[14px] text-left transition-colors hover:bg-black/[0.04] active:opacity-70 dark:hover:bg-white/[0.05]"
                     style={{
                       borderTop: idx > 0 ? "1px solid var(--mr-edge)" : undefined,
                     }}
@@ -241,58 +240,61 @@ function MobileVaultHome({ route }: VaultHomeScreenProps) {
 
         {/* Add a place */}
         {!isReadOnly && (
-          <button
-            type="button"
-            onClick={async () => {
-              const name = window.prompt("Place name:");
-              if (!name?.trim()) return;
-              const existingNames = vault?.locations.map((l) => l.name) ?? [];
-              const confirmed = await checkDuplicate("place", name.trim(), existingNames);
-              if (confirmed) addLocation(name.trim());
-            }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-[14px] text-[14px] font-[500] transition-all hover:brightness-[0.92] active:opacity-70 dark:hover:brightness-[1.1]"
-            style={{
-              border: "1.5px dashed var(--mr-edge-strong)",
-              color: "var(--mr-dim)",
-            }}
+          <Button
+            variant="dashed"
+            size="lg"
+            fullWidth
+            onClick={openNewPlace}
+            className="mt-3 min-h-[52px] rounded-[14px]"
           >
-            <Plus size={16} />
+            <Plus size={16} aria-hidden="true" />
             Add a place
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Rename Vault Modal */}
-      <Modal
+      {/* Rename Vault */}
+      <ResponsiveDialog
         open={showRenameModal}
         onOpenChange={(open) => {
           setShowRenameModal(open);
           if (!open) setRenameValue("");
         }}
         title="Rename vault"
+        historyId="rename-vault"
+        action={{ label: "Rename", form: "rename-vault-form", disabled: !renameValue.trim() }}
+        footer={
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="rename-vault-form"
+              variant="primary"
+              disabled={!renameValue.trim()}
+            >
+              Rename
+            </Button>
+          </div>
+        }
       >
-        <div className="flex flex-col gap-4 p-5">
+        <form id="rename-vault-form" onSubmit={handleRename} className="p-5">
           <Input
             placeholder="Vault name"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRename()}
+            autoCapitalize="words"
+            enterKeyHint="done"
             autoFocus
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" disabled={!renameValue.trim()} onClick={handleRename}>
-              Rename
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </form>
+      </ResponsiveDialog>
 
+      {ShareDialogComponent}
       {VaultDataDialogComponent}
       {VersionHistoryDialogComponent}
-      {DuplicateConfirmDialogComponent}
+      {NewPlaceDialogComponent}
     </div>
   );
 }

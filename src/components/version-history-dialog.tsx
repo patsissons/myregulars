@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useIsMobile } from "@/lib/use-media";
-import { Modal } from "@/components/ui/modal";
-import { Sheet } from "@/components/ui/sheet";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { listDatastoreVersions } from "@/lib/db";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { useVault } from "@/lib/vault-context";
@@ -160,22 +158,17 @@ interface VersionHistoryDialogComponentProps {
 }
 
 function VersionHistoryDialogComponent({ open, onClose, uri }: VersionHistoryDialogComponentProps) {
-  const isMobile = useIsMobile();
-
-  const content = open ? <VersionHistoryContent uri={uri} /> : null;
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="Version history">
-        {content}
-      </Sheet>
-    );
-  }
-
   return (
-    <Modal open={open} onOpenChange={(o) => !o && onClose()} title="Version history" width={480}>
-      {content}
-    </Modal>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title="Version history"
+      historyId="version-history"
+      cancelLabel="Done"
+      width={480}
+    >
+      {open ? <VersionHistoryContent uri={uri} /> : null}
+    </ResponsiveDialog>
   );
 }
 

@@ -23,9 +23,17 @@ export interface PersonFormConfig {
 interface PersonFormProps {
   config: PersonFormConfig;
   onClose: () => void;
+  /**
+   * "sheet": the host renders Cancel/Save in its header, so the form shows
+   * only Delete at the bottom. "modal": the form renders its own action row.
+   */
+  layout?: "modal" | "sheet";
 }
 
-export function PersonForm({ config, onClose }: PersonFormProps) {
+/** The form's id, so a host's header button can submit it. */
+export const PERSON_FORM_ID = "person-form";
+
+export function PersonForm({ config, onClose, layout = "modal" }: PersonFormProps) {
   const { mode, location, locationId, person } = config;
   const { vault, addGroup, addPerson, updatePerson, deletePerson, movePerson } = useVault();
   const { showToast } = useToast();
@@ -79,7 +87,8 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
     setShowNewGroupInput(false);
   }
 
-  async function handleSave() {
+  async function handleSave(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!name.trim()) return;
 
     // Determine group ID (may need to create the group first)
@@ -140,7 +149,7 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
   const canSave = name.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-5 p-5">
+    <form id={PERSON_FORM_ID} onSubmit={handleSave} className="flex flex-col gap-5 p-5">
       {/* Avatar preview + Name */}
       <div className="flex items-center gap-4">
         <Avatar name={name || "?"} size={56} photoUrl={photoUrl || undefined} />
@@ -150,6 +159,9 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
           placeholder="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          autoCapitalize="words"
+          autoComplete="off"
+          enterKeyHint="next"
           className="min-w-0 flex-1 bg-transparent outline-none"
           style={{
             fontSize: 22,
@@ -186,8 +198,13 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                 placeholder="Group name"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
+                autoCapitalize="words"
+                enterKeyHint="done"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateGroup();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleCreateGroup();
+                  }
                   if (e.key === "Escape") {
                     setShowNewGroupInput(false);
                     setNewGroupName("");
@@ -299,7 +316,13 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
                   placeholder="Species"
                   value={newPetSpecies}
                   onChange={(e) => setNewPetSpecies(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddPet()}
+                  enterKeyHint="done"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddPet();
+                    }
+                  }}
                   className="h-7 w-20 rounded-full px-3 text-[16px] outline-none lg:text-[13px]"
                   style={{
                     background: "var(--mr-subtle)",
@@ -326,42 +349,46 @@ export function PersonForm({ config, onClose }: PersonFormProps) {
       )}
 
       {/* Actions */}
-      <div
-        className="flex items-center justify-between gap-2 border-t pt-4"
-        style={{ borderColor: "var(--mr-edge)" }}
-      >
-        {/* Delete (edit mode only) */}
-        {mode === "edit" && !showDeleteConfirm && (
-          <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-            Delete person
-          </Button>
-        )}
-        {mode === "edit" && showDeleteConfirm && (
-          <div className="flex items-center gap-2">
-            <span className="text-[12px]" style={{ color: "var(--mr-danger)" }}>
-              Sure?
-            </span>
-            <Button variant="danger" size="sm" onClick={handleDelete}>
-              Yes, delete
+      {(layout === "modal" || mode === "edit") && (
+        <div
+          className="flex items-center justify-between gap-2 border-t pt-4"
+          style={{ borderColor: "var(--mr-edge)" }}
+        >
+          {/* Delete (edit mode only) */}
+          {mode === "edit" && !showDeleteConfirm && (
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+              Delete person
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>
-              Cancel
-            </Button>
-          </div>
-        )}
-        {mode === "add" && <div />}
+          )}
+          {mode === "edit" && showDeleteConfirm && (
+            <div className="flex items-center gap-2">
+              <span className="text-[12px]" style={{ color: "var(--mr-danger)" }}>
+                Sure?
+              </span>
+              <Button variant="danger" size="sm" onClick={handleDelete}>
+                Yes, delete
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+            </div>
+          )}
+          {mode === "add" && <div />}
 
-        <div className="flex gap-2">
-          <Button variant="secondary" size="md" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="md" onClick={handleSave} disabled={!canSave}>
-            {mode === "add" ? "Add person" : "Save"}
-          </Button>
+          {layout === "modal" && (
+            <div className="flex gap-2">
+              <Button variant="secondary" size="md" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" size="md" disabled={!canSave}>
+                {mode === "add" ? "Add person" : "Save"}
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {DuplicateConfirmDialogComponent}
-    </div>
+    </form>
   );
 }

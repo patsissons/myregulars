@@ -5,8 +5,7 @@ import { useIsMobile } from "@/lib/use-media";
 import { Check, Copy, Eye } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Sheet } from "@/components/ui/sheet";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { buildShareUrl, getGistIdFromUri } from "@/lib/datastore/uri";
 import { useVault } from "@/lib/vault-context";
 
@@ -106,25 +105,20 @@ interface ShareDialogComponentProps {
 
 function ShareDialogComponent({ open, onClose }: ShareDialogComponentProps) {
   const { uri } = useVault();
-  const isMobile = useIsMobile();
 
   const shareUrl = uri && typeof window !== "undefined" ? buildShareUrl(getGistIdFromUri(uri)) : "";
   const uriStr = uri ?? "";
 
-  const content = open && shareUrl ? <ShareContent shareUrl={shareUrl} uri={uriStr} /> : null;
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="Share vault">
-        {content}
-      </Sheet>
-    );
-  }
-
   return (
-    <Modal open={open} onOpenChange={(o) => !o && onClose()} title="Share vault">
-      {content}
-    </Modal>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title="Share vault"
+      historyId="share"
+      cancelLabel="Done"
+    >
+      {open && shareUrl ? <ShareContent shareUrl={shareUrl} uri={uriStr} /> : null}
+    </ResponsiveDialog>
   );
 }
 

@@ -29,3 +29,25 @@ function getServerIsMobile(): boolean {
 export function useIsMobile(): boolean {
   return useSyncExternalStore(subscribe, getIsMobile, getServerIsMobile);
 }
+
+function subscribeOnline(callback: () => void): () => void {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+
+function getOnline(): boolean {
+  return navigator.onLine;
+}
+
+function getServerOnline(): boolean {
+  return true;
+}
+
+/** Browser connectivity as the UA reports it (optimistic: true on the server). */
+export function useOnline(): boolean {
+  return useSyncExternalStore(subscribeOnline, getOnline, getServerOnline);
+}

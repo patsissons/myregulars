@@ -1,87 +1,67 @@
+import { forwardRef } from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-type ButtonVariant = "primary" | "secondary" | "danger" | "dashed";
-type ButtonSize = "sm" | "md" | "lg";
+export const buttonVariants = cva(
+  [
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap select-none",
+    "transition-all duration-[120ms] active:scale-[0.97]",
+    "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+    "focus-visible:ring-mr-accent focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
+    // Touch devices get a 44px row regardless of the visual size.
+    "coarse:min-h-11",
+  ],
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-mr-accent text-mr-accent-text border border-transparent hover:brightness-95 dark:hover:brightness-110",
+        secondary:
+          "text-mr-text border-mr-edge-strong border bg-transparent hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+        danger:
+          "text-mr-danger border-mr-danger border bg-transparent hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+        dashed:
+          "text-mr-dim border-mr-edge-strong border-[1.5px] border-dashed bg-transparent hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+        ghost:
+          "text-mr-dim hover:text-mr-text border border-transparent bg-transparent hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+      },
+      size: {
+        sm: "h-7 px-3 text-[12px]",
+        md: "h-8 px-4 text-[13px]",
+        lg: "h-10 px-5 text-[14px]",
+      },
+      fullWidth: {
+        true: "w-full",
+        false: "",
+      },
+    },
+    defaultVariants: {
+      variant: "secondary",
+      size: "md",
+      fullWidth: false,
+    },
+  },
+);
 
-interface ButtonProps {
-  children: React.ReactNode;
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  fullWidth?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-  type?: "button" | "submit" | "reset";
-  className?: string;
-  style?: React.CSSProperties;
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  /** Render the child element instead of a <button>, merging classes and props (links, Radix triggers). */
+  asChild?: boolean;
 }
 
-const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
-  primary: {
-    background: "var(--mr-accent)",
-    color: "var(--mr-accent-text)",
-    border: "none",
-  },
-  secondary: {
-    background: "transparent",
-    color: "var(--mr-text)",
-    border: "1px solid var(--mr-edge-strong)",
-  },
-  danger: {
-    background: "transparent",
-    color: "var(--mr-danger)",
-    border: "1px solid var(--mr-danger)",
-  },
-  dashed: {
-    background: "transparent",
-    color: "var(--mr-dim)",
-    border: "1.5px dashed var(--mr-edge-strong)",
-  },
-};
-
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-7 px-3 text-[12px]",
-  md: "h-8 px-4 text-[13px]",
-  lg: "h-10 px-5 text-[14px]",
-};
-
-// Hover per variant. The transparent variants set `background` via inline style,
-// which a plain `hover:bg-*` utility cannot override — so they use the important
-// (`!`) modifier to win over the inline value. The filled primary keeps a
-// brightness shift instead, so its accent background is preserved.
-const variantHover: Record<ButtonVariant, string> = {
-  primary: "hover:brightness-95 dark:hover:brightness-110",
-  secondary: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
-  danger: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
-  dashed: "hover:bg-black/[0.05]! dark:hover:bg-white/[0.07]!",
-};
-
-export function Button({
-  children,
-  variant = "secondary",
-  size = "md",
-  fullWidth = false,
-  disabled = false,
-  onClick,
-  type = "button",
-  className,
-  style,
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant, size, fullWidth, asChild = false, type, ...props },
+  ref,
+) {
+  const Comp = asChild ? Slot : "button";
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-[120ms] select-none",
-        "active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-        variantHover[variant],
-        sizeStyles[size],
-        fullWidth && "w-full",
-        className,
-      )}
-      style={{ ...variantStyles[variant], ...style }}
-    >
-      {children}
-    </button>
+    <Comp
+      ref={ref}
+      // Only a real <button> gets a default type; a Slot child keeps its own.
+      {...(asChild ? {} : { type: type ?? "button" })}
+      className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+      {...props}
+    />
   );
-}
+});
