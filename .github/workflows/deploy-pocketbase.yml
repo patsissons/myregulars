@@ -1,9 +1,19 @@
 name: Deploy PocketBase
 
-# Pushes the committed migrations and hooks to the PocketHost instance over
-# FTP whenever they change on main. Hooks reload live; migrations apply on the
-# instance's next start, so the job ends by waking it and reminding you to
-# power-cycle from the PocketHost dashboard when a migration shipped.
+# Pushes the committed migrations and hooks to the PocketHost instance named in
+# .phioconfig whenever they change on main, using PocketHost's phio CLI over
+# SFTP. Hooks reload live; migrations apply on the instance's next start, so the
+# job ends by waking the instance and reminding you to power-cycle it from the
+# PocketHost dashboard when a migration shipped.
+#
+# Secrets (production environment):
+#   PHIO_USERNAME / PHIO_PASSWORD — the PocketHost account login, for a
+#     non-interactive `phio` session.
+#   PHIO_DEPLOY_KEY (optional) — an OpenSSH ed25519 private key phio already
+#     registered on the account (run `npx phio login` locally, then copy the
+#     `phio_deploy_ed25519` file from the directory `npx phio info` prints).
+#     Without it phio generates and registers a fresh key on every run.
+# Variable: NEXT_PUBLIC_POCKETBASE_URL — the instance URL, for the wake-up ping.
 
 on:
   push:
@@ -11,6 +21,7 @@ on:
     paths:
       - "pocketbase/pb_migrations/**"
       - "pocketbase/pb_hooks/**"
+      - ".phioconfig"
   workflow_dispatch:
 
 concurrency:
@@ -25,25 +36,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload pb_migrations
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      # phio needs Node 24+ (it ships TypeScript sources).
+      - uses: actions/setup-node@v4
         with:
-          server: ftp.pockethost.io
-          username: ${{ secrets.POCKETHOST_FTP_USER }}
-          password: ${{ secrets.POCKETHOST_FTP_PASSWORD }}
-          local-dir: pocketbase/pb_migrations/
-          server-dir: ${{ vars.POCKETHOST_INSTANCE }}/pb_migrations/
-          dangerous-clean-slate: false
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Upload pb_hooks
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ftp.pockethost.io
-          username: ${{ secrets.POCKETHOST_FTP_USER }}
-          password: ${{ secrets.POCKETHOST_FTP_PASSWORD }}
-          local-dir: pocketbase/pb_hooks/
-          server-dir: ${{ vars.POCKETHOST_INSTANCE }}/pb_hooks/
-          dangerous-clean-slate: false
+      - run: npm install --no-audit --no-fund
+
+      - name: Restore the deploy key (optional)
+        if: ${{ secrets.PHIO_DEPLOY_KEY != '' }}
+        run: |
+          mkdir -p "$PHIO_HOME"
+          printf '%s\n' "$PHIO_DEPLOY_KEY" > "$PHIO_HOME/phio_deploy_ed25519"
+          chmod 600 "$PHIO_HOME/phio_deploy_ed25519"
+          ssh-keygen -y -f "$PHIO_HOME/phio_deploy_ed25519" > "$PHIO_HOME/phio_deploy_ed25519.pub"
+        env:
+          PHIO_HOME: ${{ runner.temp }}/phio
+          PHIO_DEPLOY_KEY: ${{ secrets.PHIO_DEPLOY_KEY }}
+
+      - name: Deploy pb_migrations + pb_hooks with phio
+        run: npm run pb:deploy
+        env:
+          PHIO_HOME: ${{ runner.temp }}/phio
+          PHIO_USERNAME: ${{ secrets.PHIO_USERNAME }}
+          PHIO_PASSWORD: ${{ secrets.PHIO_PASSWORD }}
 
       - name: Wake the instance
         run: |

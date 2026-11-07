@@ -56,15 +56,16 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with your GitHub
 
 ## Scripts
 
-| Command                       | Purpose                                       |
-| ----------------------------- | --------------------------------------------- |
-| `npm run dev`                 | Start development server                      |
-| `npm run build`               | Production build                              |
-| `npm run format-and-validate` | Format, typecheck, lint, and test in one pass |
-| `npm test`                    | Run unit/component tests (Vitest)             |
-| `npm run test:e2e`            | Run end-to-end tests (Playwright)             |
-| `npm run cf:preview`          | Build and run the Cloudflare Worker locally   |
-| `npm run cf:deploy`           | Build and deploy the Cloudflare Worker        |
+| Command                       | Purpose                                        |
+| ----------------------------- | ---------------------------------------------- |
+| `npm run dev`                 | Start development server                       |
+| `npm run build`               | Production build                               |
+| `npm run format-and-validate` | Format, typecheck, lint, and test in one pass  |
+| `npm test`                    | Run unit/component tests (Vitest)              |
+| `npm run test:e2e`            | Run end-to-end tests (Playwright)              |
+| `npm run cf:preview`          | Build and run the Cloudflare Worker locally    |
+| `npm run cf:deploy`           | Build and deploy the Cloudflare Worker         |
+| `npm run pb:deploy`           | Push PocketBase migrations/hooks to PocketHost |
 
 ## Deployment
 
@@ -82,14 +83,19 @@ PocketBase instance on PocketHost (see `pocketbase/README.md`).
 **Automatic deploys.** `.github/workflows/deploy.yml` deploys `main` on every push. It needs, on
 the repository's `production` environment:
 
-- secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`;
+- secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`. The same two
+  in `.env.local` let `npm run cf:deploy` work from your machine, since wrangler reads `.env*`;
 - secrets `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (the Gist OAuth app). The
   workflow pushes them to the Worker as runtime secrets on each deploy;
 - variable `NEXT_PUBLIC_POCKETBASE_URL` (inlined into the client bundle at build time).
 
-`.github/workflows/deploy-pocketbase.yml` uploads `pocketbase/pb_migrations` and `pb_hooks` to
-PocketHost over FTP when they change; see `pocketbase/README.md` for its secrets and the
-power-cycle note.
+**PocketBase (PocketHost).** `.github/workflows/deploy-pocketbase.yml` pushes
+`pocketbase/pb_migrations` and `pb_hooks` to the instance named in the committed `.phioconfig`
+whenever they change on `main`, using [phio](https://pockethost.io/blog/phio-sftp-deploy),
+PocketHost's SFTP deploy CLI. It needs `PHIO_USERNAME` / `PHIO_PASSWORD` (your PocketHost login)
+as `production` secrets. The same thing from your machine: `npx phio login` once, then
+`npm run pb:deploy`. Hooks reload live; **migrations run on the instance's next start**, so
+power-cycle it from the PocketHost dashboard after a migration ships. See `pocketbase/README.md`.
 
 **Local preview.** Put the two `GITHUB_OAUTH_*` values in `.dev.vars` (gitignored) and run
 `npm run cf:preview`; the Worker serves on `http://localhost:8787`. The GitHub OAuth app's callback
