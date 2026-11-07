@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { beginGitHubAuth, clearGitHubAuthToken, getGitHubAuthToken } from "@/lib/datastore/auth";
 import { beginHostedAuth, clearHostedAuth, getHostedUser } from "@/lib/datastore/pocketbase-auth";
 import type { HostedAuthProviderId } from "@/lib/datastore/constants";
+import type { DatastoreProviderId } from "@/lib/datastore/types";
 import { getAuthenticatedUser } from "@/lib/github-user";
 
 interface ProviderAuthSummary {
@@ -20,6 +21,8 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
+  /** Both providers in one shape; the top-level GitHub fields are kept as aliases. */
+  providers: Record<DatastoreProviderId, ProviderAuthSummary>;
   login: () => Promise<void>;
   logout: () => void;
   loginHosted: (provider: HostedAuthProviderId) => Promise<void>;
@@ -159,8 +162,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, hosted: { isAuthenticated: false, username: null } }));
   }, []);
 
+  const providers: Record<DatastoreProviderId, ProviderAuthSummary> = {
+    gist: { isAuthenticated: state.isAuthenticated, username: state.username },
+    hosted: state.hosted,
+  };
+
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, loginHosted, logoutHosted }}>
+    <AuthContext.Provider value={{ ...state, providers, login, logout, loginHosted, logoutHosted }}>
       {children}
     </AuthContext.Provider>
   );

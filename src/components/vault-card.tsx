@@ -45,8 +45,17 @@ export function VaultCard({ vault, onClick, loading = false, className }: VaultC
               color: "var(--mr-faint)",
               border: "1px solid var(--mr-edge)",
             }}
+            title={
+              vault.replicas?.gist && vault.replicas?.hosted
+                ? "Stored in both a Gist and Hosted"
+                : undefined
+            }
           >
-            {vault.provider === "hosted" ? "Hosted" : "Gist"}
+            {vault.replicas?.gist && vault.replicas?.hosted
+              ? "Gist + Hosted"
+              : vault.provider === "hosted"
+                ? "Hosted"
+                : "Gist"}
           </span>
         </div>
         {loading ? (
