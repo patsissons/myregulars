@@ -26,7 +26,8 @@ beforeEach(() => {
 });
 
 function Harness() {
-  const { openVersionHistory, VersionHistoryDialogComponent } = useVersionHistoryDialog("vault1");
+  const { openVersionHistory, VersionHistoryDialogComponent } =
+    useVersionHistoryDialog("gist:vault1");
   return (
     <>
       <button onClick={openVersionHistory}>open history</button>

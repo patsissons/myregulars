@@ -1,7 +1,5 @@
 "use client";
 
-import { use } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { PersonDetailPane } from "@/components/person-detail-pane";
 import { LocationDetailContent } from "@/components/location-detail-content";
@@ -13,17 +11,20 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { useToast } from "@/components/ui/toast";
 import { formatLastSeen } from "@/lib/datastore/helpers";
 import { findPerson, useVault } from "@/lib/vault-context";
+import { goBack, navigate } from "@/lib/router/history";
+import { routes, type Route } from "@/lib/router/routes";
+import { useIsMobile } from "@/lib/use-media";
 
-export default function PersonPage({
-  params,
-}: {
-  params: Promise<{ vaultId: string; locationId: string; personId: string }>;
-}) {
-  const { vaultId, locationId, personId } = use(params);
-  const router = useRouter();
+interface PersonScreenProps {
+  route: Extract<Route, { kind: "person" }>;
+}
+
+export function PersonScreen({ route }: PersonScreenProps) {
+  const isMobile = useIsMobile();
   const { vault, isReadOnly, logVisit } = useVault();
   const { showToast } = useToast();
   const { openAdd, openEdit, DialogComponent } = usePersonFormDialog();
+  const { uri, locationId, personId, version } = route;
 
   const result = findPerson(vault, locationId, personId);
   const location = vault?.locations.find((l) => l.id === locationId);
@@ -39,12 +40,15 @@ export default function PersonPage({
   if (!result || !location) {
     return (
       <div
-        className="flex min-h-dvh items-center justify-center"
+        className="flex min-h-dvh flex-col items-center justify-center gap-3"
         style={{ background: "var(--mr-bg)" }}
       >
         <span className="text-[13px]" style={{ color: "var(--mr-faint)" }}>
           Person not found.
         </span>
+        <Button variant="secondary" size="sm" onClick={goBack}>
+          Back
+        </Button>
       </div>
     );
   }
@@ -52,7 +56,8 @@ export default function PersonPage({
   const { person, group } = result;
 
   function handleClose() {
-    router.push(`/v/${vaultId}/l/${locationId}`);
+    // Closing the rail replaces the entry so Back doesn't reopen the person.
+    navigate(routes.location(uri, locationId, version), { replace: true, transition: "none" });
   }
 
   function handleEdit() {
@@ -60,49 +65,62 @@ export default function PersonPage({
     openEdit(locationId, group.id, person, location);
   }
 
+  function handleSawToday() {
+    logVisit(location!.id, group.id, person.id);
+    showToast("Visit logged");
+  }
+
+  if (!isMobile) {
+    return (
+      <>
+        <div className="flex h-full">
+          {/* Center: location detail */}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <LocationDetailContent
+              location={location}
+              uri={uri}
+              version={version}
+              activePersonId={personId}
+              onAddPerson={() => openAdd(locationId, location)}
+            />
+          </div>
+
+          {/* Right rail */}
+          <div
+            className="w-[360px] shrink-0 overflow-hidden"
+            style={{ borderLeft: "1px solid var(--mr-edge)" }}
+          >
+            <PersonDetailPane
+              person={person}
+              group={group}
+              location={location}
+              uri={uri}
+              version={version}
+              onClose={handleClose}
+              onEdit={handleEdit}
+            />
+          </div>
+        </div>
+        {DialogComponent}
+        {LogVisitDialogComponent}
+      </>
+    );
+  }
+
   return (
     <>
-      {/* ─── Desktop: location center + person right rail ─── */}
-      <div className="hidden h-full lg:flex">
-        {/* Center: location detail */}
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <LocationDetailContent
-            location={location}
-            vaultId={vaultId}
-            activePersonId={personId}
-            onAddPerson={() => openAdd(locationId, location)}
-          />
-        </div>
-
-        {/* Right rail */}
-        <div
-          className="w-[360px] shrink-0 overflow-hidden"
-          style={{ borderLeft: "1px solid var(--mr-edge)" }}
-        >
-          <PersonDetailPane
-            person={person}
-            group={group}
-            location={location}
-            vaultId={vaultId}
-            onClose={handleClose}
-            onEdit={handleEdit}
-          />
-        </div>
-      </div>
-
-      {/* ─── Mobile: full-screen person detail ─── */}
       <div
-        className="flex min-h-dvh flex-col lg:hidden"
+        className="safe-x flex min-h-dvh flex-col"
         style={{ background: "var(--mr-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {/* Mobile header */}
         <div
-          className="flex shrink-0 items-center justify-between px-4 pt-4 pb-3"
+          className="safe-top flex shrink-0 items-center justify-between px-4 pt-4 pb-3"
           style={{ borderBottom: "1px solid var(--mr-edge)" }}
         >
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={goBack}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/[0.07] dark:hover:bg-white/[0.08]"
             aria-label="Back"
           >
@@ -149,15 +167,7 @@ export default function PersonPage({
           {/* Action row */}
           {!isReadOnly && (
             <div className="mt-1 flex w-full gap-2">
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onClick={() => {
-                  logVisit(location.id, group.id, person.id);
-                  showToast("Visit logged");
-                }}
-              >
+              <Button variant="primary" size="lg" fullWidth onClick={handleSawToday}>
                 Saw today
               </Button>
               <Button variant="secondary" size="lg" onClick={openLogVisit}>

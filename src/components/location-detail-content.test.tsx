@@ -19,8 +19,8 @@ vi.mock("@/lib/vault-context", () => ({
   }),
 }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocks.push }),
+vi.mock("@/lib/router/history", () => ({
+  navigate: mocks.push,
 }));
 
 vi.mock("@/components/ui/toast", () => ({
@@ -60,7 +60,7 @@ beforeEach(() => {
 
 describe("LocationDetailContent", () => {
   it("renders all people across groups initially", () => {
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("Carol")).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe("LocationDetailContent", () => {
 
   it("filters the visible people by the search query", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.type(screen.getByPlaceholderText("Search people"), "Alice");
 
@@ -79,7 +79,7 @@ describe("LocationDetailContent", () => {
 
   it("shows an empty state when the search matches nobody", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.type(screen.getByPlaceholderText("Search people"), "zzz-no-match");
 
@@ -89,7 +89,7 @@ describe("LocationDetailContent", () => {
 
   it("filters people when a group chip is selected", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.click(screen.getByRole("button", { name: "Regulars" }));
 
@@ -104,7 +104,7 @@ describe("LocationDetailContent", () => {
     render(
       <LocationDetailContent
         location={buildLocation()}
-        vaultId="vault1"
+        uri="gist:vault1"
         onAddPerson={onAddPerson}
       />,
     );
@@ -115,7 +115,7 @@ describe("LocationDetailContent", () => {
 
   it("deletes the place and navigates after confirming", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.click(screen.getByRole("button", { name: "Delete place" }));
 
@@ -123,12 +123,15 @@ describe("LocationDetailContent", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(mocks.deleteLocation).toHaveBeenCalledWith("loc1");
-    expect(mocks.push).toHaveBeenCalledWith("/v/vault1");
+    expect(mocks.push).toHaveBeenCalledWith(
+      { kind: "vault", uri: "gist:vault1" },
+      { replace: true, transition: "none" },
+    );
   });
 
   it("does not delete the place when the confirmation is cancelled", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.click(screen.getByRole("button", { name: "Delete place" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -139,7 +142,7 @@ describe("LocationDetailContent", () => {
 
   it("toasts instead of deleting a non-empty group", async () => {
     const user = userEvent.setup();
-    render(<LocationDetailContent location={buildLocation()} vaultId="vault1" />);
+    render(<LocationDetailContent location={buildLocation()} uri="gist:vault1" />);
 
     await user.click(screen.getByRole("button", { name: "Delete group Baristas" }));
 

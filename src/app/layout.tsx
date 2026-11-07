@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast";
-import { ResumeWatchdog } from "@/components/resume-watchdog";
 import { VaultStoreEffects } from "@/components/vault-store-effects";
 import "./globals.css";
 
@@ -68,7 +67,6 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-mr-bg text-mr-text flex min-h-full flex-col">
-        <ResumeWatchdog />
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
