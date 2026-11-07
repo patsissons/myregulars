@@ -49,15 +49,17 @@ export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSe
     return () => clearTimeout(timer);
   }, [query]);
 
-  // ⌘K shortcut — desktop only
+  // ⌘K focuses search from anywhere; Escape only acts while search is active,
+  // so it doesn't swallow Escape meant for dialogs elsewhere on the page.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         inputRef.current?.focus();
         setOpen(true);
+        return;
       }
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && (open || document.activeElement === inputRef.current)) {
         inputRef.current?.blur();
         setOpen(false);
         setQuery("");
@@ -65,7 +67,7 @@ export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSe
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -108,8 +110,12 @@ export function VaultSearch({ vaultId, className, showShortcut = true }: VaultSe
         />
         <input
           ref={inputRef}
-          type="text"
+          type="search"
           role="searchbox"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           aria-label="Search vault"
           aria-autocomplete="list"
           placeholder="Search vault"

@@ -28,6 +28,26 @@ test.describe("mobile CRUD journeys", () => {
     await expect(page.getByText("Riverside Diner").filter({ visible: true }).first()).toBeVisible();
   });
 
+  test("log a visit from the person page", async ({ page }) => {
+    await page.goto(`/v/${GIST_ID}/l/loc-cafe/p/p-alice`);
+
+    // Quick path: one tap, with feedback.
+    await page.getByRole("button", { name: "Saw today" }).click();
+    await expect(page.getByRole("status")).toContainText("Visit logged");
+
+    // Detailed path: the Log… dialog used to be inert on mobile.
+    await page.getByRole("button", { name: "Log…" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel("Date").fill("2026-06-10");
+    await dialog.getByLabel("Note (optional)").fill("Trivia night");
+    await dialog.getByRole("button", { name: "Log visit" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText("2026-06-10").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText("Trivia night").filter({ visible: true }).first()).toBeVisible();
+  });
+
   test("rename a place from the header menu", async ({ page }) => {
     await page.goto(`/v/${GIST_ID}/l/loc-cafe`);
 

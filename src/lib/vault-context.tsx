@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useOptionalToast } from "@/components/ui/toast";
 import { createDatastore, loadDatastore, loadDatastoreVersion, saveDatastore } from "@/lib/db";
 import { DatastoreConflictError } from "@/lib/datastore/errors";
 import { createEmptyDocument } from "@/lib/datastore/schema";
@@ -10,6 +11,8 @@ import {
   createPerson,
   extractVaultNameFromFileName,
   generateId,
+  localDateString,
+  toVisitTimestamp,
 } from "@/lib/datastore/helpers";
 import { getIdFromUri, getProviderFromUri } from "@/lib/datastore/uri";
 import { getVaultAuthToken, resolveVaultOwnership } from "@/lib/datastore/ownership";
@@ -70,7 +73,14 @@ interface VaultContextValue extends VaultState {
     toGroupId: string,
     personId: string,
   ) => void;
-  logVisit: (locationId: string, groupId: string, personId: string, note?: string) => void;
+  /** Logs a visit. `day` is a local `YYYY-MM-DD`; defaults to today. */
+  logVisit: (
+    locationId: string,
+    groupId: string,
+    personId: string,
+    note?: string,
+    day?: string,
+  ) => void;
   cloneVault: (name: string) => Promise<DatastoreUri>;
   loadVaultVersion: (uri: string, version: string) => Promise<void>;
   revertToVersion: () => Promise<void>;
@@ -99,6 +109,13 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const uriRef = useRef<DatastoreUri | null>(null);
   const versionRef = useRef<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Toasts are optional so the provider also works without a ToastProvider.
+  const toast = useOptionalToast();
+  const toastRef = useRef(toast);
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
 
   function updateState(updates: Partial<VaultState>) {
     setState((prev) => ({ ...prev, ...updates }));
@@ -150,7 +167,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         });
       } catch (error) {
         if (error instanceof DatastoreConflictError) {
-          // Retry once by reloading
+          // The vault changed elsewhere. Reload the latest copy and tell the
+          // user; their unsaved local edits are replaced by the remote state.
           try {
             const snapshot = await loadDatastore(uri);
             const newVault: Vault = {
@@ -160,11 +178,18 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
             vaultRef.current = newVault;
             versionRef.current = snapshot.version;
             setState((prev) => ({ ...prev, vault: newVault, isSyncing: false }));
+            toastRef.current?.showToast("This vault changed elsewhere. Loaded the latest copy.", {
+              variant: "error",
+            });
           } catch {
             updateState({ isSyncing: false, error: "Sync conflict — reload to get latest." });
+            toastRef.current?.showToast("Sync conflict. Reload to get the latest.", {
+              variant: "error",
+            });
           }
         } else {
           updateState({ isSyncing: false, error: "Failed to save changes." });
+          toastRef.current?.showToast("Couldn't save changes.", { variant: "error" });
         }
       }
     }, DEBOUNCE_MS);
@@ -375,9 +400,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const updated: Vault = { ...current, name };
       setVault(updated);
       updateKnownVault(uri, { name });
+      scheduleSync();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [scheduleSync],
   );
 
   const addPerson = useCallback(
@@ -490,7 +516,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
               if (g.id === toGroupId) {
                 return {
                   ...g,
-                  people: [...g.people, person],
+                  people: [...g.people, { ...person, updatedAt: new Date().toISOString() }],
                   updatedAt: new Date().toISOString(),
                 };
               }
@@ -506,8 +532,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logVisit = useCallback(
-    (locationId: string, groupId: string, personId: string, note?: string) => {
-      const today = new Date().toISOString().split("T")[0] + "T00:00:00.000Z";
+    (locationId: string, groupId: string, personId: string, note?: string, day?: string) => {
+      const visitDate = toVisitTimestamp(day ?? localDateString());
       mutateLocations((locs) =>
         locs.map((l) =>
           l.id === locationId
@@ -517,19 +543,23 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
                   g.id === groupId
                     ? {
                         ...g,
-                        people: g.people.map((p) =>
-                          p.id === personId
-                            ? {
-                                ...p,
-                                lastSeen: today,
-                                visitLog: [
-                                  { date: today, ...(note ? { note } : {}) },
-                                  ...(p.visitLog ?? []),
-                                ],
-                                updatedAt: new Date().toISOString(),
-                              }
-                            : p,
-                        ),
+                        people: g.people.map((p) => {
+                          if (p.id !== personId) return p;
+                          const entry = { date: visitDate, ...(note ? { note } : {}) };
+                          // Keep the log newest-first even when back-filling an
+                          // older visit, and never let lastSeen move backwards.
+                          const visitLog = [entry, ...(p.visitLog ?? [])].sort((a, b) =>
+                            b.date.localeCompare(a.date),
+                          );
+                          const lastSeen =
+                            p.lastSeen && p.lastSeen > visitDate ? p.lastSeen : visitDate;
+                          return {
+                            ...p,
+                            lastSeen,
+                            visitLog,
+                            updatedAt: new Date().toISOString(),
+                          };
+                        }),
                         updatedAt: new Date().toISOString(),
                       }
                     : g,
