@@ -107,9 +107,13 @@ power-cycle it from the PocketHost dashboard after a migration ships. See `pocke
 URL must match the origin you are testing (`<origin>/api/auth/github/callback`), so production
 uses its own OAuth app pointed at the Worker's domain.
 
-**Custom domain.** Attach `myregulars.app` to the Worker as a custom domain in the Cloudflare
-dashboard once its DNS is on Cloudflare; until then the `*.workers.dev` URL is the app's origin and
-must be the one registered on the GitHub OAuth app.
+**Custom domain.** `myregulars.app` already resolves through Cloudflare, so the cutover is:
+deploy the Worker, remove the apex's DNS-only A records that still point at Vercel, and attach the
+hostname to the Worker as a custom domain (Cloudflare then manages its records and certificate).
+`scripts/cloudflare-cutover.sh` does the last two steps through the API (dry run by default,
+`--apply` to execute; `HOSTNAMES="myregulars.app www.myregulars.app"` to include `www`). The Gist
+OAuth app's callback stays `https://myregulars.app/api/auth/github/callback`, so it needs no change;
+on a bare `*.workers.dev` URL the GitHub sign-in will fail its redirect check, which is expected.
 
 ## Project structure
 
