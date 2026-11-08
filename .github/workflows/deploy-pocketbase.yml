@@ -34,9 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      PHIO_HOME: ${{ runner.temp }}/phio
       # The `secrets` context is not allowed in step `if:` conditions, so the
       # optional key is lifted into job env and the step tests `env` instead.
+      # (`runner.temp` is only valid inside steps, so PHIO_HOME is set per step.)
       PHIO_DEPLOY_KEY: ${{ secrets.PHIO_DEPLOY_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -57,10 +57,13 @@ jobs:
           printf '%s\n' "$PHIO_DEPLOY_KEY" > "$PHIO_HOME/phio_deploy_ed25519"
           chmod 600 "$PHIO_HOME/phio_deploy_ed25519"
           ssh-keygen -y -f "$PHIO_HOME/phio_deploy_ed25519" > "$PHIO_HOME/phio_deploy_ed25519.pub"
+        env:
+          PHIO_HOME: ${{ runner.temp }}/phio
 
       - name: Deploy pb_migrations + pb_hooks with phio
         run: npm run pb:deploy
         env:
+          PHIO_HOME: ${{ runner.temp }}/phio
           PHIO_USERNAME: ${{ secrets.PB_SUPERUSER_EMAIL }}
           PHIO_PASSWORD: ${{ secrets.PB_SUPERUSER_PASSWORD }}
 
