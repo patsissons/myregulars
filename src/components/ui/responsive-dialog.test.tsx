@@ -61,6 +61,28 @@ describe("ResponsiveDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("keeps the mobile header to three grid cells so the action stays on the title row", () => {
+    setWidth(390);
+    render(
+      <ResponsiveDialog
+        open
+        onOpenChange={() => {}}
+        title="Edit person"
+        action={{ label: "Save", onClick: () => {} }}
+      >
+        <p>Body</p>
+      </ResponsiveDialog>,
+    );
+    // The empty Radix description must not occupy a column of the
+    // Cancel · Title · Action grid, or the action wraps to a second row.
+    const header = screen.getByRole("button", { name: "Save" }).parentElement?.parentElement;
+    expect(header?.className).toContain("grid-cols-[1fr_auto_1fr]");
+    const visible = Array.from(header?.children ?? []).filter(
+      (el) => !el.classList.contains("hidden"),
+    );
+    expect(visible).toHaveLength(3);
+  });
+
   it("submits a form by id from the header action", async () => {
     const user = userEvent.setup();
     setWidth(390);

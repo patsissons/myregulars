@@ -103,7 +103,7 @@ export function Sheet({
               >
                 {title}
               </Dialog.Title>
-              <Dialog.Description />
+              <Dialog.Description className="hidden" />
               <div className="justify-self-end">
                 {action && (
                   <button
@@ -128,7 +128,7 @@ export function Sheet({
                 >
                   {title}
                 </Dialog.Title>
-                <Dialog.Description />
+                <Dialog.Description className="hidden" />
               </div>
             )
           )}
